@@ -1,0 +1,5 @@
+{
+  "name": "2048-miniapp",
+  "description": "A classic 2048 game built with React and Tailwind CSS, with potential for future EVM smart contract integration for features like high-score NFTs.",
+  "requestFramePermissions": []
+}
