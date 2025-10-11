@@ -13,6 +13,12 @@ const TILE_COLORS: { [key: number]: string } = {
   512: 'bg-yellow-600 text-white font-bold',
   1024: 'bg-indigo-500 text-white font-extrabold',
   2048: 'bg-indigo-700 text-white font-extrabold',
+  4096: 'bg-purple-600 text-white font-extrabold',
+  8192: 'bg-purple-800 text-white font-extrabold',
+  16384: 'bg-teal-500 text-white font-extrabold',
+  32768: 'bg-teal-700 text-white font-extrabold',
+  65536: 'bg-lime-500 text-white font-extrabold',
+  131072: 'bg-gray-900 text-white font-extrabold',
 };
 
 const Tile: React.FC<TileData> = ({ value, row, col, isNew, isMerged }) => {
@@ -25,7 +31,18 @@ const Tile: React.FC<TileData> = ({ value, row, col, isNew, isMerged }) => {
     animationClass = 'animate-tile-merge';
   }
 
-  const textSizeClass = value > 1000 ? 'text-xl sm:text-3xl' : value > 100 ? 'text-2xl sm:text-4xl' : 'text-3xl sm:text-5xl';
+  let textSizeClass;
+  if (value >= 100000) { // 6+ digits
+    textSizeClass = 'text-base sm:text-xl';
+  } else if (value >= 10000) { // 5 digits
+    textSizeClass = 'text-lg sm:text-2xl';
+  } else if (value >= 1000) { // 4 digits
+    textSizeClass = 'text-xl sm:text-3xl';
+  } else if (value >= 100) { // 3 digits
+    textSizeClass = 'text-2xl sm:text-4xl';
+  } else { // 1-2 digits
+    textSizeClass = 'text-3xl sm:text-5xl';
+  }
   
   // Base (small screens): tile is 4rem (w-16), gap is 0.75rem (gap-3). Total step is 4.75rem. Padding is 0.75rem.
   // SM screens: tile is 5rem (w-20), gap is 1rem (gap-4). Total step is 6rem. Padding is 1rem.
