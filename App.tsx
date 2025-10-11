@@ -50,11 +50,11 @@ const App: React.FC = () => {
 
   return (
     <div className="min-h-screen w-screen text-white flex flex-col items-center justify-center p-2 sm:p-4 font-sans overflow-hidden">
-      <div className="w-full max-w-xs sm:max-w-md mx-auto flex flex-col items-center">
+      <div className="w-full sm:max-w-md mx-auto flex flex-col items-center">
         <GameControls score={score} bestScore={bestScore} onNewGame={newGame} />
         
         <div 
-          className="relative"
+          className="relative w-full"
           style={{ touchAction: 'none' }} // Prevents browser from scrolling on touch devices
           onTouchStart={handleTouchStart}
           onTouchEnd={handleTouchEnd}
