@@ -59,27 +59,29 @@ const App: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen w-screen text-white flex flex-col items-center justify-start p-4 font-sans overflow-hidden">
-      <div className="w-full sm:max-w-md mx-auto flex flex-col items-center">
+    <div className="min-h-screen w-screen text-white flex flex-col items-center p-4 font-sans overflow-hidden">
+      <div className="w-full sm:max-w-md mx-auto flex flex-col flex-grow">
         <Tabs activeTab={activeTab} onTabChange={setActiveTab} />
         
-        {activeTab === 'game' ? (
-          <div 
-            className="w-full flex flex-col items-center animate-fade-in"
-            style={{ touchAction: 'none' }} // Prevents browser from scrolling on touch devices
-            onTouchStart={handleTouchStart}
-            onTouchEnd={handleTouchEnd}
-          >
-            <GameControls score={score} bestScore={bestScore} onNewGame={newGame} />
-            
-            <div className="relative w-full">
-              <GameBoard tiles={tiles} />
-              {isGameOver && <GameOver onRestart={newGame} score={score} />}
+        <main className="flex-grow flex flex-col items-center justify-center w-full">
+          {activeTab === 'game' ? (
+            <div 
+              className="w-full flex flex-col items-center animate-fade-in"
+              style={{ touchAction: 'none' }} // Prevents browser from scrolling on touch devices
+              onTouchStart={handleTouchStart}
+              onTouchEnd={handleTouchEnd}
+            >
+              <GameControls score={score} bestScore={bestScore} onNewGame={newGame} />
+              
+              <div className="relative w-full">
+                <GameBoard tiles={tiles} />
+                {isGameOver && <GameOver onRestart={newGame} score={score} />}
+              </div>
             </div>
-          </div>
-        ) : (
-          <Leaderboard bestScore={bestScore} />
-        )}
+          ) : (
+            <Leaderboard bestScore={bestScore} />
+          )}
+        </main>
       </div>
     </div>
   );
