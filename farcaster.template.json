@@ -1,4 +1,3 @@
-
 {
   "accountAssociation": {
     "header": "eyJmaWQiOjQ5MTk2MSwidHlwZSI6ImN1c3RvZHkiLCJrZXkiOiIweDFDMUFjOWQ1NDk4NzgyRkZhODcwOTVCMWE0Mzg3RjE4NDZBZWREODYifQ",
@@ -15,17 +14,16 @@
     "iconUrl": "https://2048-base.vercel.app/icon.png",
     "splashImageUrl": "https://2048-base.vercel.app/splash.png",
     "splashBackgroundColor": "#1e293b",
-    "webhookUrl": "",
-    "subtitle": "Classic 2048 puzzle game on Base.",
+    "subtitle": "Classic 2048 puzzle on Base.",
     "description": "A modern and responsive implementation of the classic 2048 puzzle game. Merge tiles to reach the 2048 tile.",
     "screenshotUrls": [
       "https://2048-base.vercel.app/screenshot1.png",
       "https://2048-base.vercel.app/screenshot2.png"
     ],
-    "primaryCategory": "game",
+    "primaryCategory": "games",
     "tags": ["game", "puzzle", "2048", "base"],
     "heroImageUrl": "https://2048-base.vercel.app/og-image.png",
-    "tagline": "Join the numbers and get to the 2048 tile!",
+    "tagline": "Get to the 2048 tile!",
     "ogTitle": "2048 Mini App on Base",
     "ogDescription": "Play the classic 2048 puzzle game directly on Farcaster.",
     "ogImageUrl": "https://2048-base.vercel.app/og-image.png",
