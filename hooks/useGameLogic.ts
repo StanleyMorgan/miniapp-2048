@@ -44,8 +44,8 @@ export const useGameLogic = () => {
   }, [score, bestScore]);
 
   const submitScore = useCallback(async (finalScore: number) => {
-    // IMPORTANT: Replace this with your actual backend endpoint URL.
-    const BACKEND_URL = '/api/submit-score'; 
+    // This now points to the production Vercel serverless function.
+    const BACKEND_URL = 'https://2048-base.vercel.app/api/submit-score'; 
     console.log(`Submitting score ${finalScore} to backend...`);
     
     try {
@@ -63,7 +63,6 @@ export const useGameLogic = () => {
       }
     } catch (error) {
       console.error('An error occurred during score submission:', error);
-      // This is expected to fail in the current setup without a real backend.
     }
   }, []);
 

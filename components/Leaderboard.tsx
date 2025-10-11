@@ -22,8 +22,8 @@ const Leaderboard: React.FC<LeaderboardProps> = ({ bestScore }) => {
     const fetchLeaderboard = async () => {
       setIsLoading(true);
       setError(null);
-      // IMPORTANT: Replace this with your actual backend endpoint URL.
-      const BACKEND_URL = '/api/leaderboard'; 
+      // This now points to the production Vercel serverless function.
+      const BACKEND_URL = 'https://2048-base.vercel.app/api/leaderboard'; 
 
       try {
         const response = await fetch(BACKEND_URL);
