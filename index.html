@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="en">
   <head>
@@ -10,18 +11,6 @@
     <meta property="fc:miniapp" content='{"version":"next","imageUrl":"https://2048-base.vercel.app/og-image.png","button":{"title":"Play 2048 on Base","action":{"type":"launch_miniapp","name":"2048 Mini App","url":"https://2048-base.vercel.app/","splashImageUrl":"https://2048-base.vercel.app/splash.png","splashBackgroundColor":"#1e293b"}}}' />
     
     <script src="https://cdn.tailwindcss.com"></script>
-  <script type="importmap">
-{
-  "imports": {
-    "react/": "https://aistudiocdn.com/react@^19.2.0/",
-    "react": "https://aistudiocdn.com/react@^19.2.0",
-    "react-dom/": "https://aistudiocdn.com/react-dom@^19.2.0/",
-    "@farcaster/miniapp-sdk": "https://cdn.jsdelivr.net/npm/@farcaster/miniapp-sdk/dist/index.mjs",
-    "vite": "https://aistudiocdn.com/vite@^7.1.9",
-    "@vitejs/plugin-react": "https://aistudiocdn.com/@vitejs/plugin-react@^5.0.4"
-  }
-}
-</script>
 <style>
   @keyframes tile-spawn {
     0% {
@@ -68,6 +57,21 @@
     }
   }
 </style>
+<script type="importmap">
+{
+  "imports": {
+    "vite": "https://aistudiocdn.com/vite@^7.1.9",
+    "@vitejs/plugin-react": "https://aistudiocdn.com/@vitejs/plugin-react@^5.0.4",
+    "react-dom/": "https://aistudiocdn.com/react-dom@^19.2.0/",
+    "react/": "https://aistudiocdn.com/react@^19.2.0/",
+    "react": "https://aistudiocdn.com/react@^19.2.0",
+    "fs": "https://aistudiocdn.com/fs@^0.0.1-security",
+    "url": "https://aistudiocdn.com/url@^0.11.4",
+    "path": "https://aistudiocdn.com/path@^0.12.7",
+    "@farcaster/miniapp-sdk": "https://aistudiocdn.com/@farcaster/miniapp-sdk@^0.2.0"
+  }
+}
+</script>
 </head>
   <body class="bg-slate-800">
     <div id="root"></div>

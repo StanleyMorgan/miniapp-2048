@@ -1,48 +1,42 @@
 
-const fs = require('fs');
-const path = require('path');
+import fs from 'fs';
+import path from 'path';
+import { fileURLToPath } from 'url';
 
-// Path to the template and output files
+// Replicate __dirname for ES Modules, as it's not available by default.
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
 const templatePath = path.join(__dirname, '..', 'farcaster.template.json');
 const outputPath = path.join(__dirname, '..', 'public', '.well-known', 'farcaster.json');
 const outputDir = path.dirname(outputPath);
 
-// Get the comma-separated addresses from the environment variable
-const allowedAddressesStr = process.env.VITE_ALLOWED_ADDRESSES;
-
-if (!allowedAddressesStr) {
-  console.error('Error: VITE_ALLOWED_ADDRESSES environment variable is not set.');
-  process.exit(1);
-}
-
-// Split the string into an array of addresses
-const allowedAddresses = allowedAddressesStr.split(',').map(addr => addr.trim());
-
-// Read the template file
-fs.readFile(templatePath, 'utf8', (err, data) => {
-  if (err) {
-    console.error(`Error reading template file: ${err}`);
-    process.exit(1);
+try {
+  console.log('Starting farcaster.json generation...');
+  
+  const allowedAddressesStr = process.env.VITE_ALLOWED_ADDRESSES;
+  if (!allowedAddressesStr) {
+    throw new Error('VITE_ALLOWED_ADDRESSES environment variable is not set.');
   }
 
-  // Replace the placeholder with the JSON stringified array of addresses
-  // This correctly formats the array with quotes and commas
-  const result = data.replace(
+  const allowedAddresses = allowedAddressesStr.split(',').map(addr => addr.trim());
+  console.log(`Processing ${allowedAddresses.length} allowed addresses.`);
+
+  const templateData = fs.readFileSync(templatePath, 'utf8');
+  const result = templateData.replace(
     '"__VITE_ALLOWED_ADDRESSES__"', 
     JSON.stringify(allowedAddresses)
   );
 
-  // Ensure the output directory exists
   if (!fs.existsSync(outputDir)) {
     fs.mkdirSync(outputDir, { recursive: true });
+    console.log(`Created directory: ${outputDir}`);
   }
 
-  // Write the final JSON file
-  fs.writeFile(outputPath, result, 'utf8', (err) => {
-    if (err) {
-      console.error(`Error writing final farcaster.json: ${err}`);
-      process.exit(1);
-    }
-    console.log('Successfully generated public/.well-known/farcaster.json');
-  });
-});
+  fs.writeFileSync(outputPath, result, 'utf8');
+  console.log(`Successfully generated ${outputPath}`);
+
+} catch (err) {
+  console.error('Error generating farcaster.json:', err.message);
+  process.exit(1);
+}
