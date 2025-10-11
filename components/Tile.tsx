@@ -44,18 +44,23 @@ const Tile: React.FC<TileData> = ({ value, row, col, isNew, isMerged }) => {
     textSizeClass = 'text-4xl sm:text-6xl';
   }
   
-  // Responsive positioning and sizing based on a 4x4 grid with 2% gap.
-  // 4 cells + 3 gaps = 100% of grid area. 4*C + 3*G = 100.
-  // If G = 2%, then 4*C = 94%, so C = 23.5%.
-  const CELL_PERCENT = 23.5;
+  // Calculation for responsive positioning and sizing based on the GameBoard's CSS.
+  // GameBoard has p-[2%] and gap-[2%].
+  // Total width: 100%
+  // Padding: 2% on each side (total 4%)
+  // Gaps: 3 gaps of 2% each (total 6%)
+  // Remaining for cells: 100% - 4% - 6% = 90%
+  // Each of 4 cells: 90% / 4 = 22.5%
+  const PADDING_PERCENT = 2;
   const GAP_PERCENT = 2;
-  const TOTAL_CELL_AND_GAP = CELL_PERCENT + GAP_PERCENT; // 25.5%
-
+  const NUM_CELLS = 4;
+  const CELL_PERCENT = (100 - (2 * PADDING_PERCENT) - ((NUM_CELLS - 1) * GAP_PERCENT)) / NUM_CELLS;
+  
   const style = {
     width: `${CELL_PERCENT}%`,
     height: `${CELL_PERCENT}%`,
-    top: `${row * TOTAL_CELL_AND_GAP}%`,
-    left: `${col * TOTAL_CELL_AND_GAP}%`,
+    top: `${PADDING_PERCENT + row * (CELL_PERCENT + GAP_PERCENT)}%`,
+    left: `${PADDING_PERCENT + col * (CELL_PERCENT + GAP_PERCENT)}%`,
   };
   
   return (
