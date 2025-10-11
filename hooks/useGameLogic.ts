@@ -52,8 +52,9 @@ export const useGameLogic = () => {
         setTiles([...newTiles, ...mergedTiles]);
 
         setTimeout(() => {
-          // After the animation, remove the merged tiles and add a new one
-          const finalTiles = addRandomTile(newTiles);
+          // After the animation, remove merged tiles, clear the merge flag, and add a new tile
+          const tilesAfterAnimation = newTiles.map(t => ({ ...t, isMerged: false }));
+          const finalTiles = addRandomTile(tilesAfterAnimation);
           setTiles(finalTiles);
           setIsMoving(false);
 
