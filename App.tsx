@@ -1,24 +1,34 @@
-import React, { useEffect, useState, useRef } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import { sdk } from '@farcaster/miniapp-sdk';
 import { useGameLogic } from './hooks/useGameLogic';
 import GameBoard from './components/GameBoard';
 import GameControls from './components/GameControls';
 import GameOver from './components/GameOver';
+import Tabs from './components/Tabs';
+import Leaderboard from './components/Leaderboard';
 
 const App: React.FC = () => {
   const { tiles, score, bestScore, isGameOver, newGame, handleKeyDown, performMove } = useGameLogic();
   const [touchStart, setTouchStart] = useState<{x: number, y: number} | null>(null);
+  const [activeTab, setActiveTab] = useState<'game' | 'top'>('game');
+
+  const handleGlobalKeyDown = useCallback((event: KeyboardEvent) => {
+    if (activeTab === 'game') {
+      handleKeyDown(event);
+    }
+  }, [activeTab, handleKeyDown]);
 
   useEffect(() => {
     sdk.actions.ready(); // From Farcaster Mini App SDK
 
-    window.addEventListener('keydown', handleKeyDown);
+    window.addEventListener('keydown', handleGlobalKeyDown);
     return () => {
-      window.removeEventListener('keydown', handleKeyDown);
+      window.removeEventListener('keydown', handleGlobalKeyDown);
     };
-  }, [handleKeyDown]);
+  }, [handleGlobalKeyDown]);
 
   const handleTouchStart = (e: React.TouchEvent) => {
+    // No need to check activeTab here, as this handler is only on the game container
     if (e.touches.length === 1) {
       setTouchStart({ x: e.touches[0].clientX, y: e.touches[0].clientY });
     }
@@ -51,17 +61,25 @@ const App: React.FC = () => {
   return (
     <div className="min-h-screen w-screen text-white flex flex-col items-center justify-center p-2 sm:p-4 font-sans overflow-hidden">
       <div className="w-full sm:max-w-md mx-auto flex flex-col items-center">
-        <GameControls score={score} bestScore={bestScore} onNewGame={newGame} />
+        <Tabs activeTab={activeTab} onTabChange={setActiveTab} />
         
-        <div 
-          className="relative w-full"
-          style={{ touchAction: 'none' }} // Prevents browser from scrolling on touch devices
-          onTouchStart={handleTouchStart}
-          onTouchEnd={handleTouchEnd}
-        >
-          <GameBoard tiles={tiles} />
-          {isGameOver && <GameOver onRestart={newGame} score={score} />}
-        </div>
+        {activeTab === 'game' ? (
+          <div 
+            className="w-full flex flex-col items-center animate-fade-in"
+            style={{ touchAction: 'none' }} // Prevents browser from scrolling on touch devices
+            onTouchStart={handleTouchStart}
+            onTouchEnd={handleTouchEnd}
+          >
+            <GameControls score={score} bestScore={bestScore} onNewGame={newGame} />
+            
+            <div className="relative w-full">
+              <GameBoard tiles={tiles} />
+              {isGameOver && <GameOver onRestart={newGame} score={score} />}
+            </div>
+          </div>
+        ) : (
+          <Leaderboard bestScore={bestScore} />
+        )}
       </div>
     </div>
   );
