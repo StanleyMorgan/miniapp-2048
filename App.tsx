@@ -1,5 +1,5 @@
-
 import React, { useEffect } from 'react';
+import { sdk } from '@farcaster/miniapp-sdk';
 import { useGameLogic } from './hooks/useGameLogic';
 import GameBoard from './components/GameBoard';
 import GameControls from './components/GameControls';
@@ -9,6 +9,8 @@ const App: React.FC = () => {
   const { tiles, score, bestScore, isGameOver, isWon, newGame, handleKeyDown } = useGameLogic();
 
   useEffect(() => {
+    sdk.actions.ready(); // From Farcaster Mini App SDK
+
     window.addEventListener('keydown', handleKeyDown);
     return () => {
       window.removeEventListener('keydown', handleKeyDown);
