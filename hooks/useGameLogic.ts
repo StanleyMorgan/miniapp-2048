@@ -40,28 +40,8 @@ export const useGameLogic = () => {
     }
   }, [score, bestScore]);
 
-  const handleKeyDown = useCallback((e: KeyboardEvent) => {
+  const performMove = useCallback((direction: 'up' | 'down' | 'left' | 'right') => {
     if (isGameOver || isMoving) return;
-
-    let direction: 'up' | 'down' | 'left' | 'right' | null = null;
-    switch (e.key) {
-      case 'ArrowUp':
-        direction = 'up';
-        break;
-      case 'ArrowDown':
-        direction = 'down';
-        break;
-      case 'ArrowLeft':
-        direction = 'left';
-        break;
-      case 'ArrowRight':
-        direction = 'right';
-        break;
-      default:
-        return;
-    }
-    
-    e.preventDefault();
 
     const { newTiles, mergedTiles, scoreIncrease, hasMoved } = move(tiles, direction);
     
@@ -89,6 +69,29 @@ export const useGameLogic = () => {
         }, ANIMATION_DURATION);
     }
   }, [tiles, isGameOver, score, isWon, isMoving]);
+
+  const handleKeyDown = useCallback((e: KeyboardEvent) => {
+    let direction: 'up' | 'down' | 'left' | 'right' | null = null;
+    switch (e.key) {
+      case 'ArrowUp':
+        direction = 'up';
+        break;
+      case 'ArrowDown':
+        direction = 'down';
+        break;
+      case 'ArrowLeft':
+        direction = 'left';
+        break;
+      case 'ArrowRight':
+        direction = 'right';
+        break;
+      default:
+        return;
+    }
+    
+    e.preventDefault();
+    performMove(direction);
+  }, [performMove]);
 
   // Helper function moved inside hook to encapsulate logic
   const addRandomTile = (currentTiles: TileData[]): TileData[] => {
@@ -127,7 +130,7 @@ export const useGameLogic = () => {
     return emptyCells;
   };
 
-  return { tiles, score, bestScore, isGameOver, isWon, newGame, handleKeyDown };
+  return { tiles, score, bestScore, isGameOver, isWon, newGame, handleKeyDown, performMove };
 };
 
 // Constants used in the hook

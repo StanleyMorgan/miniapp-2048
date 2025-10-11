@@ -25,18 +25,17 @@ const Tile: React.FC<TileData> = ({ value, row, col, isNew, isMerged }) => {
     animationClass = 'animate-tile-merge';
   }
 
-  const textSizeClass = value > 1000 ? 'text-2xl md:text-3xl' : value > 100 ? 'text-3xl md:text-4xl' : 'text-4xl md:text-5xl';
+  const textSizeClass = value > 1000 ? 'text-xl sm:text-3xl' : value > 100 ? 'text-2xl sm:text-4xl' : 'text-3xl sm:text-5xl';
   
-  // Base (small screens): tile is 5rem (w-20), gap is 1rem (gap-4). Total step is 6rem.
-  // MD screens: tile is 6rem (w-24), gap is 1rem (gap-4). Total step is 7rem.
-  // Board has 1rem padding (p-4), which is the initial offset.
-  const topPosition = `top-[calc(1rem+${row}*6rem)] md:top-[calc(1rem+${row}*7rem)]`;
-  const leftPosition = `left-[calc(1rem+${col}*6rem)] md:left-[calc(1rem+${col}*7rem)]`;
+  // Base (small screens): tile is 4rem (w-16), gap is 0.75rem (gap-3). Total step is 4.75rem. Padding is 0.75rem.
+  // SM screens: tile is 5rem (w-20), gap is 1rem (gap-4). Total step is 6rem. Padding is 1rem.
+  const topPosition = `top-[calc(0.75rem+${row}*4.75rem)] sm:top-[calc(1rem+${row}*6rem)]`;
+  const leftPosition = `left-[calc(0.75rem+${col}*4.75rem)] sm:left-[calc(1rem+${col}*6rem)]`;
   
   return (
     <div 
       className={`
-        w-20 h-20 md:w-24 md:h-24 rounded-md 
+        w-16 h-16 sm:w-20 sm:h-20 rounded-md 
         flex items-center justify-center 
         font-bold select-none
         absolute z-10
