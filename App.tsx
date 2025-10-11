@@ -59,7 +59,7 @@ const App: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen w-screen text-white flex flex-col items-center justify-center p-2 sm:p-4 font-sans overflow-hidden">
+    <div className="min-h-screen w-screen text-white flex flex-col items-center justify-start p-4 font-sans overflow-hidden">
       <div className="w-full sm:max-w-md mx-auto flex flex-col items-center">
         <Tabs activeTab={activeTab} onTabChange={setActiveTab} />
         
