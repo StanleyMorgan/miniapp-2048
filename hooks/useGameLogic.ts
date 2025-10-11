@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
+import { sdk } from '@farcaster/miniapp-sdk';
 import type { TileData } from '../types';
 import {
   generateInitialTiles,
@@ -19,6 +20,7 @@ export const useGameLogic = () => {
   const [isGameOver, setIsGameOver] = useState(false);
   const [isWon, setIsWon] = useState(false);
   const [isMoving, setIsMoving] = useState(false);
+  const [hasSubmittedScore, setHasSubmittedScore] = useState(false);
 
   const newGame = useCallback(() => {
     const { initialTiles } = generateInitialTiles();
@@ -27,6 +29,7 @@ export const useGameLogic = () => {
     setIsGameOver(false);
     setIsWon(false);
     setIsMoving(false);
+    setHasSubmittedScore(false); // Reset submission status for new game
   }, []);
 
   useEffect(() => {
@@ -40,6 +43,37 @@ export const useGameLogic = () => {
     }
   }, [score, bestScore]);
 
+  const submitScore = useCallback(async (finalScore: number) => {
+    // IMPORTANT: Replace this with your actual backend endpoint URL.
+    const BACKEND_URL = '/api/submit-score'; 
+    console.log(`Submitting score ${finalScore} to backend...`);
+    
+    try {
+      const res = await sdk.quickAuth.fetch(BACKEND_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ score: finalScore }),
+      });
+
+      if (res.ok) {
+        console.log('Score submitted successfully!');
+      } else {
+        const errorText = await res.text();
+        console.error('Failed to submit score to backend:', errorText);
+      }
+    } catch (error) {
+      console.error('An error occurred during score submission:', error);
+      // This is expected to fail in the current setup without a real backend.
+    }
+  }, []);
+
+  useEffect(() => {
+    if (isGameOver && !hasSubmittedScore) {
+      submitScore(score);
+      setHasSubmittedScore(true);
+    }
+  }, [isGameOver, hasSubmittedScore, score, submitScore]);
+
   const performMove = useCallback((direction: 'up' | 'down' | 'left' | 'right') => {
     if (isGameOver || isMoving) return;
 
@@ -48,11 +82,9 @@ export const useGameLogic = () => {
     if (hasMoved) {
         setIsMoving(true);
         setScore(prev => prev + scoreIncrease);
-        // Render all tiles including the ones that were merged to let them animate to their new position
         setTiles([...newTiles, ...mergedTiles]);
 
         setTimeout(() => {
-          // After the animation, remove merged tiles, clear the merge flag, and add a new tile
           const tilesAfterAnimation = newTiles.map(t => ({ ...t, isMerged: false }));
           const finalTiles = addRandomTile(tilesAfterAnimation);
           setTiles(finalTiles);
@@ -61,7 +93,6 @@ export const useGameLogic = () => {
           const has2048 = finalTiles.some(tile => tile.value === 2048);
           if (!isWon && has2048) {
               setIsWon(true);
-              // In a real scenario, you might show a "You Win!" message but allow play to continue.
           }
   
           if (checkIsGameOver(finalTiles)) {
@@ -69,32 +100,21 @@ export const useGameLogic = () => {
           }
         }, ANIMATION_DURATION);
     }
-  }, [tiles, isGameOver, score, isWon, isMoving]);
+  }, [tiles, isGameOver, isMoving, isWon]);
 
   const handleKeyDown = useCallback((e: KeyboardEvent) => {
     let direction: 'up' | 'down' | 'left' | 'right' | null = null;
     switch (e.key) {
-      case 'ArrowUp':
-        direction = 'up';
-        break;
-      case 'ArrowDown':
-        direction = 'down';
-        break;
-      case 'ArrowLeft':
-        direction = 'left';
-        break;
-      case 'ArrowRight':
-        direction = 'right';
-        break;
-      default:
-        return;
+      case 'ArrowUp': direction = 'up'; break;
+      case 'ArrowDown': direction = 'down'; break;
+      case 'ArrowLeft': direction = 'left'; break;
+      case 'ArrowRight': direction = 'right'; break;
+      default: return;
     }
-    
     e.preventDefault();
     performMove(direction);
   }, [performMove]);
 
-  // Helper function moved inside hook to encapsulate logic
   const addRandomTile = (currentTiles: TileData[]): TileData[] => {
     const grid = tilesToGrid(currentTiles);
     const emptyCells = getEmptyCells(grid);
@@ -103,7 +123,6 @@ export const useGameLogic = () => {
     const { row, col } = emptyCells[Math.floor(Math.random() * emptyCells.length)];
     const value = Math.random() < 0.9 ? 2 : 4;
     
-    // Simple ID generation, assuming tileIdCounter is managed elsewhere or implicitly
     const newId = Math.max(0, ...currentTiles.map(t => t.id)) + 1;
     const newTile: TileData = { id: newId, value, row, col, isNew: true };
     return [...currentTiles, newTile];
@@ -134,6 +153,5 @@ export const useGameLogic = () => {
   return { tiles, score, bestScore, isGameOver, isWon, newGame, handleKeyDown, performMove };
 };
 
-// Constants used in the hook
 const GRID_SIZE = 4;
 type Grid = (number | null)[][];
