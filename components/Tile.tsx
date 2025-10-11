@@ -44,21 +44,29 @@ const Tile: React.FC<TileData> = ({ value, row, col, isNew, isMerged }) => {
     textSizeClass = 'text-4xl sm:text-6xl';
   }
   
-  // Mobile: tile is 5rem (w-20), gap is 0.5rem (gap-2). Total step is 5.5rem. Padding is 0.5rem (p-2).
-  // SM screens: tile is 6rem (w-24), gap is 0.75rem (gap-3). Total step is 6.75rem. Padding is 0.75rem (p-3).
-  const topPosition = `top-[calc(0.5rem+${row}*5.5rem)] sm:top-[calc(0.75rem+${row}*6.75rem)]`;
-  const leftPosition = `left-[calc(0.5rem+${col}*5.5rem)] sm:left-[calc(0.75rem+${col}*6.75rem)]`;
+  // Responsive positioning and sizing based on a 4x4 grid with 2% gap.
+  // 4 cells + 3 gaps = 100% of grid area. 4*C + 3*G = 100.
+  // If G = 2%, then 4*C = 94%, so C = 23.5%.
+  const CELL_PERCENT = 23.5;
+  const GAP_PERCENT = 2;
+  const TOTAL_CELL_AND_GAP = CELL_PERCENT + GAP_PERCENT; // 25.5%
+
+  const style = {
+    width: `${CELL_PERCENT}%`,
+    height: `${CELL_PERCENT}%`,
+    top: `${row * TOTAL_CELL_AND_GAP}%`,
+    left: `${col * TOTAL_CELL_AND_GAP}%`,
+  };
   
   return (
     <div 
+      style={style}
       className={`
-        w-20 h-20 sm:w-24 sm:h-24 rounded-md 
+        rounded-md 
         flex items-center justify-center 
         font-bold select-none
         absolute z-10
         transition-all duration-200 ease-in-out
-        ${topPosition}
-        ${leftPosition}
         ${colorClasses}
         ${animationClass}
       `}
