@@ -1,4 +1,3 @@
-
 {
   "name": "2048-miniapp",
   "private": true,
@@ -6,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "node ./scripts/generate-farcaster.js && tsc && vite build",
+    "build": "node ./scripts/generate-farcaster.js && vite build",
     "preview": "vite preview"
   },
   "dependencies": {
