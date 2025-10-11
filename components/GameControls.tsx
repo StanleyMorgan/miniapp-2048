@@ -15,7 +15,7 @@ const ScoreBox: React.FC<{ title: string; score: number }> = ({ title, score }) 
 
 const GameControls: React.FC<GameControlsProps> = ({ score, bestScore, onNewGame }) => {
   return (
-    <div className="flex flex-wrap justify-between items-center w-full max-w-md mb-4 px-1 gap-2">
+    <div className="flex flex-wrap justify-between items-center w-full mb-4 px-1 gap-2">
       <h1 className="text-5xl sm:text-6xl font-extrabold text-white">2048</h1>
       <div className="flex items-center space-x-2 order-3 sm:order-2 w-full sm:w-auto justify-center">
         <ScoreBox title="Score" score={score} />
