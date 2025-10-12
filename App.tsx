@@ -76,7 +76,7 @@ const App: React.FC = () => {
       <div className="w-full sm:max-w-md mx-auto flex flex-col flex-grow">
         <Tabs activeTab={activeTab} onTabChange={setActiveTab} />
         
-        <main className="flex-grow flex flex-col items-center justify-center w-full">
+        <main className={`flex-grow flex flex-col w-full ${activeTab === 'game' ? 'items-center justify-center' : 'min-h-0'}`}>
           {activeTab === 'game' ? (
             <div 
               className="w-full flex flex-col items-center animate-fade-in"

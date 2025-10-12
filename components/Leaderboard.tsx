@@ -131,9 +131,11 @@ const Leaderboard: React.FC<LeaderboardProps> = ({ isReady }) => {
   };
   
   return (
-    <div className="bg-slate-600 p-4 rounded-lg w-full animate-fade-in">
-      <h2 className="text-2xl font-bold text-center text-white mb-4">Leaderboard</h2>
-      {renderContent()}
+    <div className="bg-slate-600 p-4 rounded-lg w-full animate-fade-in flex flex-col h-full">
+      <h2 className="text-2xl font-bold text-center text-white mb-4 flex-shrink-0">Leaderboard</h2>
+      <div className="flex-grow overflow-y-auto min-h-0">
+        {renderContent()}
+      </div>
     </div>
   );
 };
