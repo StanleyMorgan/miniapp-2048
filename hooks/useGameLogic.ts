@@ -10,7 +10,7 @@ import {
 const BEST_SCORE_KEY = 'bestScore2048';
 const ANIMATION_DURATION = 200;
 
-export const useGameLogic = () => {
+export const useGameLogic = (isSdkReady: boolean) => {
   const [tiles, setTiles] = useState<TileData[]>([]);
   const [score, setScore] = useState(0);
   const [bestScore, setBestScore] = useState(() => {
@@ -44,6 +44,46 @@ export const useGameLogic = () => {
       localStorage.setItem(BEST_SCORE_KEY, score.toString());
     }
   }, [score, bestScore]);
+
+  useEffect(() => {
+    const fetchUserBestScore = async () => {
+      try {
+        const authResult = await sdk.quickAuth.getToken();
+        if (!('token' in authResult)) {
+          console.warn("Could not get auth token to fetch best score.");
+          return;
+        }
+
+        const response = await fetch('/api/leaderboard', {
+          headers: { 'Authorization': `Bearer ${authResult.token}` },
+        });
+
+        if (response.ok) {
+          const leaderboardData: { isCurrentUser?: boolean; score: number }[] = await response.json();
+          const currentUserEntry = leaderboardData.find(entry => entry.isCurrentUser);
+
+          if (currentUserEntry) {
+            setBestScore(prevBest => {
+              const serverScore = currentUserEntry.score || 0;
+              const newBest = Math.max(prevBest, serverScore);
+              if (newBest > prevBest) {
+                localStorage.setItem(BEST_SCORE_KEY, newBest.toString());
+              }
+              return newBest;
+            });
+          }
+        } else {
+          console.error('Failed to fetch user best score:', await response.text());
+        }
+      } catch (error) {
+        console.error('Error fetching user best score:', error);
+      }
+    };
+
+    if (isSdkReady) {
+        fetchUserBestScore();
+    }
+  }, [isSdkReady]);
 
   const submitScore = useCallback(async () => {
     if (hasSubmittedScore || isSubmitting) return;

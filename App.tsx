@@ -8,6 +8,10 @@ import Tabs from './components/Tabs';
 import Leaderboard from './components/Leaderboard';
 
 const App: React.FC = () => {
+  const [touchStart, setTouchStart] = useState<{x: number, y: number} | null>(null);
+  const [activeTab, setActiveTab] = useState<'game' | 'top'>('game');
+  const [isSdkReady, setIsSdkReady] = useState(false);
+
   const { 
     tiles, 
     score, 
@@ -19,10 +23,7 @@ const App: React.FC = () => {
     submitScore,
     isSubmitting,
     hasSubmittedScore
-  } = useGameLogic();
-  const [touchStart, setTouchStart] = useState<{x: number, y: number} | null>(null);
-  const [activeTab, setActiveTab] = useState<'game' | 'top'>('game');
-  const [isSdkReady, setIsSdkReady] = useState(false);
+  } = useGameLogic(isSdkReady);
 
   const handleGlobalKeyDown = useCallback((event: KeyboardEvent) => {
     if (activeTab === 'game') {
