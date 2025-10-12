@@ -1,4 +1,3 @@
-
 import { sql } from '@vercel/postgres';
 import { Errors, createClient } from '@farcaster/quick-auth';
 
@@ -18,11 +17,9 @@ export async function POST(request: Request) {
     // Step 1: Verify the JWT from the request header.
     const token = authorization.split(' ')[1];
 
-    // Use VERCEL_URL for production deployments as it's more reliable.
-    // Fallback to HOSTNAME or a default for local development.
-    const domain = process.env.VERCEL_URL 
-      ? `https://${process.env.VERCEL_URL}` 
-      : (process.env.HOSTNAME || 'localhost');
+    // Use VERCEL_URL for production as it's set by Vercel.
+    // Fallback for local development. This must match the domain the frontend runs on.
+    const domain = process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'http://localhost:5173';
       
     const payload = await quickAuthClient.verifyJwt({
       token: token,
