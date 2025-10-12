@@ -28,9 +28,7 @@ export async function GET(request: Request) {
       // Use the VERCEL_URL provided by Vercel, which is more reliable than HOSTNAME.
       const domain = process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : (process.env.HOSTNAME || 'localhost');
       const payload = await quickAuthClient.verifyJwt({ token, domain });
-      // FIX: The `payload.sub` value from the decoded JWT is already a number.
-      // Using `parseInt` on a number causes a TypeScript error because it expects a string.
-      // Direct assignment is correct here.
+      // The `payload.sub` value from the decoded JWT is the user's FID.
       currentUserFid = payload.sub;
     }
   } catch (error) {
@@ -64,33 +62,37 @@ export async function GET(request: Request) {
     }));
 
     // If the current user is authenticated, find their rank and add them if they are not in the top 20.
-    if (currentUserFid) {
+    if (currentUserFid !== null) {
       const isUserInTop20 = leaderboard.some(entry => entry.isCurrentUser);
 
       if (!isUserInTop20) {
-        const { rows: userRankResult } = await sql`
-          WITH ranked_scores AS (
-            SELECT 
-              fid, 
-              score, 
-              username,
-              RANK() OVER (ORDER BY score DESC) as rank
-            FROM scores
-          )
-          SELECT fid, score, username, rank
-          FROM ranked_scores
-          WHERE fid = ${currentUserFid};
-        `;
+        const userFid = Number(currentUserFid);
+        // Safeguard to ensure the FID is a valid number before querying the database.
+        if (!isNaN(userFid)) {
+            const { rows: userRankResult } = await sql`
+              WITH ranked_scores AS (
+                SELECT 
+                  fid, 
+                  score, 
+                  username,
+                  RANK() OVER (ORDER BY score DESC) as rank
+                FROM scores
+              )
+              SELECT fid, score, username, rank
+              FROM ranked_scores
+              WHERE fid = ${userFid};
+            `;
 
-        if (userRankResult.length > 0) {
-          const user = userRankResult[0];
-          leaderboard.push({
-            rank: Number(user.rank),
-            displayName: user.username || `fid:${user.fid}`,
-            fid: Number(user.fid),
-            score: user.score,
-            isCurrentUser: true,
-          });
+            if (userRankResult.length > 0) {
+              const user = userRankResult[0];
+              leaderboard.push({
+                rank: Number(user.rank),
+                displayName: user.username || `fid:${user.fid}`,
+                fid: Number(user.fid),
+                score: user.score,
+                isCurrentUser: true,
+              });
+            }
         }
       }
     }

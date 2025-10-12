@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { sdk } from '@farcaster/miniapp-sdk';
 
@@ -40,18 +39,32 @@ const Leaderboard: React.FC<LeaderboardProps> = ({ isReady }) => {
       const BACKEND_URL = '/api/leaderboard'; // Use relative path for Vercel deployment
 
       try {
-        // First get the auth token, then use a standard fetch call.
-        const authToken = await sdk.quickAuth.getToken();
-        const response = await fetch(BACKEND_URL, {
-          headers: {
-            'Authorization': `Bearer ${authToken}`
+        let authToken: string | undefined;
+        try {
+          // Gracefully attempt to get the auth token. This may fail if not in a Farcaster client.
+          // FIX: The `getToken` method returns an object, not a string directly. We need to check for the `token` property.
+          const authResult = await sdk.quickAuth.getToken();
+          if ('token' in authResult) {
+            authToken = authResult.token;
+          } else {
+            console.warn("Could not get Farcaster auth token:", authResult.error);
           }
-        });
+        } catch (sdkError) {
+          console.warn("Could not get Farcaster auth token, proceeding without it.", sdkError);
+        }
+
+        const headers: HeadersInit = {};
+        if (authToken) {
+          headers['Authorization'] = `Bearer ${authToken}`;
+        }
+
+        const response = await fetch(BACKEND_URL, { headers });
 
         if (!response.ok) {
-          const errorBody = await response.json().catch(() => ({ message: 'Network response was not ok' }));
+          const errorBody = await response.json().catch(() => ({ message: `Network response was not ok (${response.status})` }));
           throw new Error(errorBody.message);
         }
+        
         const data: LeaderboardEntry[] = await response.json();
         setLeaderboardData(data);
       } catch (err: any) {
