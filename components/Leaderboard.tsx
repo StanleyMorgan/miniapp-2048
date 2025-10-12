@@ -108,13 +108,9 @@ const Leaderboard: React.FC<LeaderboardProps> = ({ isReady }) => {
   };
   
   return (
-    // This is the main component container. It grows to fill the space left by the tabs.
-    // It's a flex column, so its children can be controlled with flex properties.
-    <div className="bg-slate-600 p-4 rounded-lg w-full animate-fade-in flex flex-col flex-grow min-h-0">
+    <div className="bg-slate-600 p-4 rounded-lg w-full animate-fade-in flex flex-col h-full">
       
       {/* --- STATIC HEADER --- */}
-      {/* This block contains the title and column headers. It will not scroll. */}
-      {/* `flex-shrink-0` prevents it from shrinking if content overflows. */}
       <div className="flex-shrink-0">
         <h2 className="text-2xl font-bold text-center mb-4">Leaderboard</h2>
         <div className="grid grid-cols-3 gap-2 px-3 text-sm text-slate-400 font-bold mb-2">
@@ -125,9 +121,6 @@ const Leaderboard: React.FC<LeaderboardProps> = ({ isReady }) => {
       </div>
 
       {/* --- SCROLLABLE CONTENT --- */}
-      {/* This container will take up all remaining vertical space (`flex-grow`). */}
-      {/* `overflow-y-auto` makes it scrollable only when its content is too tall. */}
-      {/* `min-h-0` is crucial in a flex column to allow shrinking. */}
       <div className="flex-grow overflow-y-auto min-h-0">
         {renderContent()}
       </div>
