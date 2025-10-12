@@ -17,9 +17,11 @@ export async function POST(request: Request) {
     // Step 1: Verify the JWT from the request header.
     const token = authorization.split(' ')[1];
 
-    // Use VERCEL_URL for production as it's set by Vercel.
-    // Fallback for local development. This must match the domain the frontend runs on.
-    const domain = process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'http://localhost:5173';
+    // The domain for JWT verification must exactly match the domain the frontend is running on.
+    // Using the production URL is more reliable than VERCEL_URL, which can point to a temporary deployment URL.
+    const domain = process.env.NODE_ENV === 'development'
+      ? 'http://localhost:5173'
+      : 'https://2048-base.vercel.app';
       
     const payload = await quickAuthClient.verifyJwt({
       token: token,

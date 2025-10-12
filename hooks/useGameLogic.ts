@@ -49,7 +49,7 @@ export const useGameLogic = () => {
     if (hasSubmittedScore || isSubmitting) return;
 
     setIsSubmitting(true);
-    const BACKEND_URL = 'https://2048-base.vercel.app/api/submit-score';
+    const BACKEND_URL = '/api/submit-score'; // Use relative path for portability
     console.log(`Submitting score ${score} to backend...`);
     
     try {
