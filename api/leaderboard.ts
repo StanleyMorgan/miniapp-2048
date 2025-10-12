@@ -4,42 +4,99 @@
 export const dynamic = 'force-dynamic';
 
 import { sql } from '@vercel/postgres';
+import { createClient, Errors } from '@farcaster/quick-auth';
 
 type LeaderboardEntry = {
   rank: number;
   displayName: string;
   fid: number;
   score: number;
+  isCurrentUser?: boolean;
 };
 
 export async function GET(request: Request) {
+  const quickAuthClient = createClient();
+  const authorization = request.headers.get('Authorization');
+  let currentUserFid: number | null = null;
+
+  if (authorization && authorization.startsWith('Bearer ')) {
+    const token = authorization.split(' ')[1];
+    
+    // Use VERCEL_URL for production as it's set by Vercel.
+    // Fallback for local development.
+    const domain = process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'http://localhost:5173';
+    
+    try {
+      const payload = await quickAuthClient.verifyJwt({ token, domain });
+      currentUserFid = Number(payload.sub);
+    } catch (e) {
+      if (e instanceof Errors.InvalidTokenError) {
+        console.warn('Invalid auth token received:', e.message);
+        // Treat as unauthenticated, but don't fail the request
+      } else {
+        // For unexpected errors, log them but still proceed as unauthenticated
+        console.error('Unexpected error verifying JWT:', e);
+      }
+    }
+  }
+
   try {
-    // DEBUG: Temporarily removed all authentication and user-specific logic to isolate the problem.
-    // This simplified query just fetches the top scores.
-    const { rows } = await sql`
+    // Step 1: Fetch the top 20 players. Using RANK() is efficient for the top list.
+    const { rows: topScoresRows } = await sql`
       SELECT 
         fid, 
         score,
-        username
+        username,
+        RANK() OVER (ORDER BY score DESC) as rank
       FROM scores 
-      ORDER BY score DESC 
       LIMIT 20;
     `;
 
-    // Format the data into the structure the frontend expects.
-    const leaderboard: LeaderboardEntry[] = rows.map((row, index) => ({
-      rank: index + 1,
-      displayName: row.username || `fid:${row.fid}`, // Use username, fallback to fid
+    let leaderboard: LeaderboardEntry[] = topScoresRows.map(row => ({
+      rank: Number(row.rank),
+      displayName: row.username || `fid:${row.fid}`,
       fid: Number(row.fid),
       score: row.score,
+      isCurrentUser: currentUserFid !== null && Number(row.fid) === currentUserFid,
     }));
+
+    // Step 2: If the user is authenticated, check if they are in the top 20.
+    // If not, fetch their score and rank separately.
+    if (currentUserFid) {
+      const userInTop20 = leaderboard.some(entry => entry.isCurrentUser);
+
+      if (!userInTop20) {
+        // Use two simple queries for reliability.
+        // First, get the user's data.
+        const { rows: userRows } = await sql`
+          SELECT score, username FROM scores WHERE fid = ${currentUserFid};
+        `;
+
+        if (userRows.length > 0) {
+          const user = userRows[0];
+          
+          // Second, calculate their rank by counting players with a higher score.
+          const { rows: rankRows } = await sql`
+            SELECT COUNT(*) + 1 as rank FROM scores WHERE score > ${user.score};
+          `;
+          const userRank = Number(rankRows[0].rank);
+
+          leaderboard.push({
+            rank: userRank,
+            displayName: user.username || `fid:${currentUserFid}`,
+            fid: currentUserFid,
+            score: user.score,
+            isCurrentUser: true,
+          });
+        }
+      }
+    }
     
     return new Response(JSON.stringify(leaderboard), {
       status: 200,
       headers: { 'Content-Type': 'application/json' },
     });
   } catch (error) {
-    // If this part is reached, there is a fundamental issue with the database connection or the basic query.
     console.error('Database error fetching leaderboard:', error);
     const errorResponse = { message: 'Error fetching leaderboard data from the database.' };
     return new Response(JSON.stringify(errorResponse), {
