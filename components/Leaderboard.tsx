@@ -38,8 +38,16 @@ const Leaderboard: React.FC<LeaderboardProps> = () => {
       const BACKEND_URL = '/api/leaderboard'; // Use relative path for Vercel deployment
 
       try {
-        // Use the authenticated fetch from the Farcaster SDK
-        const response = await sdk.quickAuth.fetch(BACKEND_URL);
+        // First get the auth token, then use a standard fetch call.
+        // This bypasses a potential issue in sdk.quickAuth.fetch().
+        // FIX: Corrected method name from `getAuthToken` to `getToken`.
+        const authToken = await sdk.quickAuth.getToken();
+        const response = await fetch(BACKEND_URL, {
+          headers: {
+            'Authorization': `Bearer ${authToken}`
+          }
+        });
+
         if (!response.ok) {
           const errorBody = await response.json().catch(() => ({ message: 'Network response was not ok' }));
           throw new Error(errorBody.message);

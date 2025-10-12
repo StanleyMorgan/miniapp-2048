@@ -1,3 +1,4 @@
+
 import { sql } from '@vercel/postgres';
 import { NextResponse } from 'next/server';
 import { Errors, createClient } from '@farcaster/quick-auth';
@@ -14,10 +15,16 @@ export async function POST(request: Request) {
   try {
     // Step 1: Verify the JWT from the request header.
     const token = authorization.split(' ')[1];
+
+    // Use VERCEL_URL for production deployments as it's more reliable.
+    // Fallback to HOSTNAME or a default for local development.
+    const domain = process.env.VERCEL_URL 
+      ? `https://${process.env.VERCEL_URL}` 
+      : (process.env.HOSTNAME || 'localhost');
+      
     const payload = await quickAuthClient.verifyJwt({
       token: token,
-      // The domain is read from the HOSTNAME environment variable set in Vercel.
-      domain: process.env.HOSTNAME || '', 
+      domain: domain, 
     });
 
     // The 'sub' property of the JWT payload contains the user's Farcaster ID (FID).
