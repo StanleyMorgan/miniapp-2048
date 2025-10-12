@@ -117,16 +117,6 @@ const Leaderboard: React.FC<LeaderboardProps> = ({ isReady }) => {
   
   return (
     <div className="bg-slate-600 p-4 rounded-lg w-full animate-fade-in flex flex-col flex-grow">
-      {/* --- STATIC HEADER --- */}
-      <div className="flex-shrink-0">
-        <h2 className="text-2xl font-bold text-center text-white mb-4">Leaderboard</h2>
-        <div className="grid grid-cols-3 gap-2 text-slate-400 font-semibold uppercase text-sm px-3">
-          <span>Rank</span>
-          <span className="text-center">Player</span>
-          <span className="text-right">Score</span>
-        </div>
-      </div>
-      
       {/* --- SCROLLABLE CONTENT --- */}
       <div className="flex-grow overflow-y-auto min-h-0">
         {renderList()}
