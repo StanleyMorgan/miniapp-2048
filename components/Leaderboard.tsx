@@ -13,20 +13,6 @@ type LeaderboardEntry = {
   isCurrentUser?: boolean;
 };
 
-// A simple skeleton loader component for a better UX
-const LeaderboardSkeleton: React.FC = () => (
-  <div className="flex flex-col gap-2 animate-pulse">
-    <div className="grid grid-cols-3 gap-2 px-3">
-      <div className="h-4 bg-slate-700 rounded w-1/4"></div>
-      <div className="h-4 bg-slate-700 rounded w-1/3 mx-auto"></div>
-      <div className="h-4 bg-slate-700 rounded w-1/4 ml-auto"></div>
-    </div>
-    {Array.from({ length: 5 }).map((_, i) => (
-      <div key={i} className="p-3 rounded-md bg-slate-700 h-[52px]"></div>
-    ))}
-  </div>
-);
-
 const Leaderboard: React.FC<LeaderboardProps> = ({ isReady }) => {
   const [leaderboardData, setLeaderboardData] = useState<LeaderboardEntry[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -84,9 +70,15 @@ const Leaderboard: React.FC<LeaderboardProps> = ({ isReady }) => {
     }
   }, [isReady]);
 
-  const renderContent = () => {
+  const renderList = () => {
     if (isLoading) {
-      return <LeaderboardSkeleton />;
+      return (
+        <div className="flex flex-col gap-2 animate-pulse pt-2">
+          {Array.from({ length: 8 }).map((_, i) => (
+            <div key={i} className="p-3 rounded-md bg-slate-700 h-[52px]"></div>
+          ))}
+        </div>
+      );
     }
 
     if (error) {
@@ -101,14 +93,7 @@ const Leaderboard: React.FC<LeaderboardProps> = ({ isReady }) => {
     const sortedData = [...leaderboardData].sort((a, b) => a.rank - b.rank);
 
     return (
-      <div className="flex flex-col gap-2">
-        {/* Header Row */}
-        <div className="grid grid-cols-3 gap-2 text-slate-400 font-semibold uppercase text-sm px-3">
-          <span>Rank</span>
-          <span className="text-center">Player</span>
-          <span className="text-right">Score</span>
-        </div>
-        
+      <div className="flex flex-col gap-2 pt-2">
         {/* Score Rows */}
         {sortedData.map(({ rank, displayName, fid, score, isCurrentUser }) => (
           <div 
@@ -132,9 +117,19 @@ const Leaderboard: React.FC<LeaderboardProps> = ({ isReady }) => {
   
   return (
     <div className="bg-slate-600 p-4 rounded-lg w-full animate-fade-in flex flex-col flex-grow">
-      <h2 className="text-2xl font-bold text-center text-white mb-4 flex-shrink-0">Leaderboard</h2>
+      {/* --- STATIC HEADER --- */}
+      <div className="flex-shrink-0">
+        <h2 className="text-2xl font-bold text-center text-white mb-4">Leaderboard</h2>
+        <div className="grid grid-cols-3 gap-2 text-slate-400 font-semibold uppercase text-sm px-3">
+          <span>Rank</span>
+          <span className="text-center">Player</span>
+          <span className="text-right">Score</span>
+        </div>
+      </div>
+      
+      {/* --- SCROLLABLE CONTENT --- */}
       <div className="flex-grow overflow-y-auto min-h-0">
-        {renderContent()}
+        {renderList()}
       </div>
     </div>
   );
