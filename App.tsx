@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState, useCallback } from 'react';
 import { sdk } from '@farcaster/miniapp-sdk';
 import { useGameLogic } from './hooks/useGameLogic';
@@ -9,7 +8,18 @@ import Tabs from './components/Tabs';
 import Leaderboard from './components/Leaderboard';
 
 const App: React.FC = () => {
-  const { tiles, score, bestScore, isGameOver, newGame, handleKeyDown, performMove } = useGameLogic();
+  const { 
+    tiles, 
+    score, 
+    bestScore, 
+    isGameOver, 
+    newGame, 
+    handleKeyDown, 
+    performMove,
+    submitScore,
+    isSubmitting,
+    hasSubmittedScore
+  } = useGameLogic();
   const [touchStart, setTouchStart] = useState<{x: number, y: number} | null>(null);
   const [activeTab, setActiveTab] = useState<'game' | 'top'>('game');
   const [isSdkReady, setIsSdkReady] = useState(false);
@@ -78,7 +88,15 @@ const App: React.FC = () => {
               
               <div className="relative w-full">
                 <GameBoard tiles={tiles} />
-                {isGameOver && <GameOver onRestart={newGame} score={score} />}
+                {isGameOver && (
+                  <GameOver 
+                    onRestart={newGame} 
+                    score={score} 
+                    onSubmitScore={submitScore}
+                    isSubmitting={isSubmitting}
+                    hasSubmittedScore={hasSubmittedScore}
+                  />
+                )}
               </div>
             </div>
           ) : (

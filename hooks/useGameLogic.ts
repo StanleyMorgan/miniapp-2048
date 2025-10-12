@@ -20,6 +20,7 @@ export const useGameLogic = () => {
   const [isGameOver, setIsGameOver] = useState(false);
   const [isWon, setIsWon] = useState(false);
   const [isMoving, setIsMoving] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [hasSubmittedScore, setHasSubmittedScore] = useState(false);
 
   const newGame = useCallback(() => {
@@ -29,7 +30,8 @@ export const useGameLogic = () => {
     setIsGameOver(false);
     setIsWon(false);
     setIsMoving(false);
-    setHasSubmittedScore(false); // Reset submission status for new game
+    setHasSubmittedScore(false);
+    setIsSubmitting(false);
   }, []);
 
   useEffect(() => {
@@ -43,35 +45,34 @@ export const useGameLogic = () => {
     }
   }, [score, bestScore]);
 
-  const submitScore = useCallback(async (finalScore: number) => {
-    // This now points to the production Vercel serverless function.
-    const BACKEND_URL = 'https://2048-base.vercel.app/api/submit-score'; 
-    console.log(`Submitting score ${finalScore} to backend...`);
+  const submitScore = useCallback(async () => {
+    if (hasSubmittedScore || isSubmitting) return;
+
+    setIsSubmitting(true);
+    const BACKEND_URL = 'https://2048-base.vercel.app/api/submit-score';
+    console.log(`Submitting score ${score} to backend...`);
     
     try {
       const res = await sdk.quickAuth.fetch(BACKEND_URL, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ score: finalScore }),
+        body: JSON.stringify({ score }),
       });
 
       if (res.ok) {
         console.log('Score submitted successfully!');
+        setHasSubmittedScore(true);
       } else {
         const errorText = await res.text();
         console.error('Failed to submit score to backend:', errorText);
+        // Optionally, you could set an error state here to show in the UI
       }
     } catch (error) {
       console.error('An error occurred during score submission:', error);
+    } finally {
+      setIsSubmitting(false);
     }
-  }, []);
-
-  useEffect(() => {
-    if (isGameOver && !hasSubmittedScore) {
-      submitScore(score);
-      setHasSubmittedScore(true);
-    }
-  }, [isGameOver, hasSubmittedScore, score, submitScore]);
+  }, [score, hasSubmittedScore, isSubmitting]);
 
   const performMove = useCallback((direction: 'up' | 'down' | 'left' | 'right') => {
     if (isGameOver || isMoving) return;
@@ -149,7 +150,7 @@ export const useGameLogic = () => {
     return emptyCells;
   };
 
-  return { tiles, score, bestScore, isGameOver, isWon, newGame, handleKeyDown, performMove };
+  return { tiles, score, bestScore, isGameOver, isWon, newGame, handleKeyDown, performMove, submitScore, isSubmitting, hasSubmittedScore };
 };
 
 const GRID_SIZE = 4;
