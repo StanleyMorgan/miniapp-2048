@@ -11,6 +11,7 @@ const App: React.FC = () => {
   const [touchStart, setTouchStart] = useState<{x: number, y: number} | null>(null);
   const [activeTab, setActiveTab] = useState<'game' | 'top'>('game');
   const [isSdkReady, setIsSdkReady] = useState(false);
+  const [shouldShowSaveFlow, setShouldShowSaveFlow] = useState(false);
 
   const { 
     tiles, 
@@ -73,12 +74,25 @@ const App: React.FC = () => {
     setTouchStart(null);
   };
   
-  // A new best score is achieved if the server score is known and beaten,
-  // otherwise, it falls back to comparing against the local best score.
-  // This correctly handles logged-in users vs. anonymous users.
+  // This logic determines if a new best score has been achieved.
   const isNewBestScore = serverBestScore !== null
     ? score > serverBestScore
     : score > bestScore;
+
+  // This effect "latches" the decision to show the save/share flow.
+  // When the game ends, we check if it's a new best score. If so, we set a state.
+  // This state persists even if `isNewBestScore` becomes false after saving the score,
+  // ensuring the "Share" button can be shown. It resets on a new game.
+  useEffect(() => {
+    if (isGameOver) {
+      if (isNewBestScore && score > 0) {
+        setShouldShowSaveFlow(true);
+      }
+    } else {
+      setShouldShowSaveFlow(false);
+    }
+  }, [isGameOver, isNewBestScore, score]);
+
 
   return (
     <div className="min-h-screen w-screen text-white flex flex-col items-center p-4 font-sans">
@@ -104,7 +118,7 @@ const App: React.FC = () => {
                     onSubmitScore={submitScore}
                     isSubmitting={isSubmitting}
                     hasSubmittedScore={hasSubmittedScore}
-                    isNewBestScore={isNewBestScore && score > 0}
+                    isNewBestScore={shouldShowSaveFlow}
                   />
                 )}
               </div>

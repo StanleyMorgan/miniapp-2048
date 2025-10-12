@@ -41,7 +41,7 @@ const GameOver: React.FC<GameOverProps> = ({ onRestart, score, onSubmitScore, is
               onClick={handleShare}
               className="bg-purple-600 hover:bg-purple-700 text-white font-bold py-3 px-6 rounded-lg transition-colors duration-200 text-lg"
             >
-              Share on Farcaster
+              Share
             </button>
           ) : (
             <button
