@@ -22,16 +22,13 @@ export async function GET(request: Request) {
   if (authorization && authorization.startsWith('Bearer ')) {
     const token = authorization.split(' ')[1];
     
-    const getDomain = () => {
-      // Vercel provides the VERCEL_URL env var, which contains the domain of the deployment.
-      const vercelUrl = process.env.VERCEL_URL;
-      if (vercelUrl) {
-        return vercelUrl;
-      }
-      // Fallback for local development when not running on Vercel.
-      return 'localhost:5173';
-    };
-    const domain = getDomain();
+    // Determine the domain from the request's Host header for reliable verification.
+    const host = request.headers.get('Host');
+    if (!host) {
+      console.error(`[leaderboard] Missing Host header.`);
+      return new Response(JSON.stringify({ message: 'Bad Request: Missing Host header' }), { status: 400 });
+    }
+    const domain = host;
     
     // Enhanced logging for debugging
     console.log(`[leaderboard] Attempting to verify token. Domain: "${domain}". Token starts with: "${token.substring(0, 10)}..."`);
