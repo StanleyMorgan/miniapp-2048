@@ -44,14 +44,14 @@ export async function POST(request: Request) {
       });
     }
 
-    // Step 2: Fetch the username from a Farcaster API (e.g., Neynar's public API)
+    // Step 2: Fetch the username from Warpcast's public API.
     let username: string | null = null;
     try {
-      const userResponse = await fetch(`https://api.neynar.com/v2/farcaster/user/bulk?fids=${fid}`);
+      const userResponse = await fetch(`https://api.warpcast.com/v2/user-by-fid?fid=${fid}`);
       if (userResponse.ok) {
         const userData = await userResponse.json();
-        if (userData.users && userData.users.length > 0) {
-          username = userData.users[0].username;
+        if (userData.result && userData.result.user) {
+          username = userData.result.user.username;
           console.log(`[submit-score] Fetched username "${username}" for FID ${fid}`);
         }
       } else {
