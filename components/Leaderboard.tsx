@@ -47,7 +47,10 @@ const Leaderboard: React.FC<LeaderboardProps> = ({ isReady }) => {
           if ('token' in authResult) {
             authToken = authResult.token;
           } else {
-            console.warn("Could not get Farcaster auth token:", authResult.error);
+            // FIX: The type of authResult in the else branch is inferred as 'never' by TypeScript,
+            // likely due to an incomplete type definition for `getToken()`. Logging the whole object
+            // is safer, fixes the compilation error, and provides more informative debug output.
+            console.warn("Could not get Farcaster auth token:", authResult);
           }
         } catch (sdkError) {
           console.warn("Could not get Farcaster auth token, proceeding without it.", sdkError);

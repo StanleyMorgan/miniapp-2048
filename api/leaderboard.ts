@@ -67,29 +67,28 @@ export async function GET(request: Request) {
 
       if (!isUserInTop20) {
         const userFid = Number(currentUserFid);
-        // Safeguard to ensure the FID is a valid number before querying the database.
         if (!isNaN(userFid)) {
-            const { rows: userRankResult } = await sql`
-              WITH ranked_scores AS (
-                SELECT 
-                  fid, 
-                  score, 
-                  username,
-                  RANK() OVER (ORDER BY score DESC) as rank
-                FROM scores
-              )
-              SELECT fid, score, username, rank
-              FROM ranked_scores
-              WHERE fid = ${userFid};
+            // Step 1: Get the user's score and username with a simple query.
+            const { rows: userResult } = await sql`
+              SELECT score, username FROM scores WHERE fid = ${userFid};
             `;
 
-            if (userRankResult.length > 0) {
-              const user = userRankResult[0];
+            if (userResult.length > 0) {
+              const userScoreData = userResult[0];
+              
+              // Step 2: Calculate their rank with another simple query.
+              const { rows: rankResult } = await sql`
+                SELECT COUNT(*) FROM scores WHERE score > ${userScoreData.score};
+              `;
+              
+              const higherRankCount = parseInt(rankResult[0].count, 10);
+              const userRank = higherRankCount + 1;
+
               leaderboard.push({
-                rank: Number(user.rank),
-                displayName: user.username || `fid:${user.fid}`,
-                fid: Number(user.fid),
-                score: user.score,
+                rank: userRank,
+                displayName: userScoreData.username || `fid:${userFid}`,
+                fid: userFid,
+                score: userScoreData.score,
                 isCurrentUser: true,
               });
             }
