@@ -2,7 +2,9 @@
 import React, { useState, useEffect } from 'react';
 import { sdk } from '@farcaster/miniapp-sdk';
 
-interface LeaderboardProps {}
+interface LeaderboardProps {
+  isReady: boolean;
+}
 
 type LeaderboardEntry = {
   rank: number;
@@ -26,7 +28,7 @@ const LeaderboardSkeleton: React.FC = () => (
   </div>
 );
 
-const Leaderboard: React.FC<LeaderboardProps> = () => {
+const Leaderboard: React.FC<LeaderboardProps> = ({ isReady }) => {
   const [leaderboardData, setLeaderboardData] = useState<LeaderboardEntry[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -39,8 +41,6 @@ const Leaderboard: React.FC<LeaderboardProps> = () => {
 
       try {
         // First get the auth token, then use a standard fetch call.
-        // This bypasses a potential issue in sdk.quickAuth.fetch().
-        // FIX: Corrected method name from `getAuthToken` to `getToken`.
         const authToken = await sdk.quickAuth.getToken();
         const response = await fetch(BACKEND_URL, {
           headers: {
@@ -62,8 +62,11 @@ const Leaderboard: React.FC<LeaderboardProps> = () => {
       }
     };
 
-    fetchLeaderboard();
-  }, []);
+    // Only attempt to fetch data once the SDK has signaled that it's ready.
+    if (isReady) {
+      fetchLeaderboard();
+    }
+  }, [isReady]);
 
   const renderContent = () => {
     if (isLoading) {

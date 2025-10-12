@@ -1,4 +1,3 @@
-
 // Vercel Edge Functions are fast, but for database queries, a standard Serverless Function is often better.
 // We can configure this in vercel.json if needed, but for now, the default is fine.
 // This tells Vercel to not cache the response and always fetch the latest data.
@@ -29,7 +28,10 @@ export async function GET(request: Request) {
       // Use the VERCEL_URL provided by Vercel, which is more reliable than HOSTNAME.
       const domain = process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : (process.env.HOSTNAME || 'localhost');
       const payload = await quickAuthClient.verifyJwt({ token, domain });
-      currentUserFid = parseInt(payload.sub, 10);
+      // FIX: The `payload.sub` value from the decoded JWT is already a number.
+      // Using `parseInt` on a number causes a TypeScript error because it expects a string.
+      // Direct assignment is correct here.
+      currentUserFid = payload.sub;
     }
   } catch (error) {
     if (error instanceof Errors.InvalidTokenError) {

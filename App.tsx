@@ -12,6 +12,7 @@ const App: React.FC = () => {
   const { tiles, score, bestScore, isGameOver, newGame, handleKeyDown, performMove } = useGameLogic();
   const [touchStart, setTouchStart] = useState<{x: number, y: number} | null>(null);
   const [activeTab, setActiveTab] = useState<'game' | 'top'>('game');
+  const [isSdkReady, setIsSdkReady] = useState(false);
 
   const handleGlobalKeyDown = useCallback((event: KeyboardEvent) => {
     if (activeTab === 'game') {
@@ -20,7 +21,8 @@ const App: React.FC = () => {
   }, [activeTab, handleKeyDown]);
 
   useEffect(() => {
-    sdk.actions.ready(); // From Farcaster Mini App SDK
+    // Ensure the SDK is ready before we attempt to use any of its functionality.
+    sdk.actions.ready().then(() => setIsSdkReady(true));
 
     window.addEventListener('keydown', handleGlobalKeyDown);
     return () => {
@@ -80,7 +82,7 @@ const App: React.FC = () => {
               </div>
             </div>
           ) : (
-            <Leaderboard />
+            <Leaderboard isReady={isSdkReady} />
           )}
         </main>
       </div>
