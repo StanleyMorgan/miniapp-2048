@@ -1,6 +1,5 @@
 
 import { sql } from '@vercel/postgres';
-import { NextResponse } from 'next/server';
 import { Errors, createClient } from '@farcaster/quick-auth';
 
 // Initialize the Farcaster Quick Auth client.
@@ -9,7 +8,10 @@ const quickAuthClient = createClient();
 export async function POST(request: Request) {
   const authorization = request.headers.get('Authorization');
   if (!authorization || !authorization.startsWith('Bearer ')) {
-    return NextResponse.json({ message: 'Missing or invalid authorization token' }, { status: 401 });
+    return new Response(JSON.stringify({ message: 'Missing or invalid authorization token' }), {
+      status: 401,
+      headers: { 'Content-Type': 'application/json' },
+    });
   }
 
   try {
@@ -33,7 +35,10 @@ export async function POST(request: Request) {
 
     // Basic validation for the score.
     if (typeof score !== 'number' || score < 0) {
-      return NextResponse.json({ message: 'Invalid score provided' }, { status: 400 });
+      return new Response(JSON.stringify({ message: 'Invalid score provided' }), {
+        status: 400,
+        headers: { 'Content-Type': 'application/json' },
+      });
     }
     
     // Step 2: Save the score to the database using an "UPSERT" operation.
@@ -52,16 +57,25 @@ export async function POST(request: Request) {
         scores.score < EXCLUDED.score;
     `;
 
-    return NextResponse.json({ success: true, message: `Score for FID ${fid} has been processed.` }, { status: 200 });
+    return new Response(JSON.stringify({ success: true, message: `Score for FID ${fid} has been processed.` }), {
+      status: 200,
+      headers: { 'Content-Type': 'application/json' },
+    });
 
   } catch (e) {
     if (e instanceof Errors.InvalidTokenError) {
       // If the token is invalid, return a 401 Unauthorized error.
       console.warn('Invalid token received:', e.message);
-      return NextResponse.json({ message: 'Invalid token' }, { status: 401 });
+      return new Response(JSON.stringify({ message: 'Invalid token' }), {
+        status: 401,
+        headers: { 'Content-Type': 'application/json' },
+      });
     }
     // For any other unexpected errors, return a 500 Internal Server Error.
     console.error('An unexpected error occurred during score submission:', e);
-    return NextResponse.json({ message: 'An unexpected error occurred' }, { status: 500 });
+    return new Response(JSON.stringify({ message: 'An unexpected error occurred' }), {
+      status: 500,
+      headers: { 'Content-Type': 'application/json' },
+    });
   }
 }

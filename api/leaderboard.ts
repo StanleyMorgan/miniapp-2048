@@ -4,7 +4,6 @@
 export const dynamic = 'force-dynamic';
 
 import { sql } from '@vercel/postgres';
-import { NextResponse } from 'next/server';
 
 type LeaderboardEntry = {
   rank: number;
@@ -35,10 +34,17 @@ export async function GET(request: Request) {
       score: row.score,
     }));
     
-    return NextResponse.json(leaderboard, { status: 200 });
+    return new Response(JSON.stringify(leaderboard), {
+      status: 200,
+      headers: { 'Content-Type': 'application/json' },
+    });
   } catch (error) {
     // If this part is reached, there is a fundamental issue with the database connection or the basic query.
     console.error('Database error fetching leaderboard:', error);
-    return NextResponse.json({ message: 'Error fetching leaderboard data from the database.' }, { status: 500 });
+    const errorResponse = { message: 'Error fetching leaderboard data from the database.' };
+    return new Response(JSON.stringify(errorResponse), {
+      status: 500,
+      headers: { 'Content-Type': 'application/json' },
+    });
   }
 }
