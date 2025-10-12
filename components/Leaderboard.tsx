@@ -22,20 +22,15 @@ const Leaderboard: React.FC<LeaderboardProps> = ({ isReady }) => {
     const fetchLeaderboard = async () => {
       setIsLoading(true);
       setError(null);
-      const BACKEND_URL = '/api/leaderboard'; // Use relative path for Vercel deployment
+      const BACKEND_URL = '/api/leaderboard';
 
       try {
         let authToken: string | undefined;
         try {
-          // Gracefully attempt to get the auth token. This may fail if not in a Farcaster client.
-          // FIX: The `getToken` method returns an object, not a string directly. We need to check for the `token` property.
           const authResult = await sdk.quickAuth.getToken();
           if ('token' in authResult) {
             authToken = authResult.token;
           } else {
-            // FIX: The type of authResult in the else branch is inferred as 'never' by TypeScript,
-            // likely due to an incomplete type definition for `getToken()`. Logging the whole object
-            // is safer, fixes the compilation error, and provides more informative debug output.
             console.warn("Could not get Farcaster auth token:", authResult);
           }
         } catch (sdkError) {
@@ -64,17 +59,16 @@ const Leaderboard: React.FC<LeaderboardProps> = ({ isReady }) => {
       }
     };
 
-    // Only attempt to fetch data once the SDK has signaled that it's ready.
     if (isReady) {
       fetchLeaderboard();
     }
   }, [isReady]);
 
-  const renderList = () => {
+  const renderContent = () => {
     if (isLoading) {
       return (
-        <div className="flex flex-col gap-2 animate-pulse pt-2">
-          {Array.from({ length: 8 }).map((_, i) => (
+        <div className="flex flex-col gap-2 animate-pulse">
+          {Array.from({ length: 15 }).map((_, i) => (
             <div key={i} className="p-3 rounded-md bg-slate-700 h-[52px]"></div>
           ))}
         </div>
@@ -89,12 +83,10 @@ const Leaderboard: React.FC<LeaderboardProps> = ({ isReady }) => {
         return <div className="text-center text-slate-400 p-8">No scores yet. Be the first!</div>;
     }
     
-    // Sort data to ensure user's score is in the right place if added at the end
     const sortedData = [...leaderboardData].sort((a, b) => a.rank - b.rank);
 
     return (
-      <div className="flex flex-col gap-2 pt-2">
-        {/* Score Rows */}
+      <div className="flex flex-col gap-2">
         {sortedData.map(({ rank, displayName, fid, score, isCurrentUser }) => (
           <div 
             key={`${rank}-${fid}`} 
@@ -116,10 +108,28 @@ const Leaderboard: React.FC<LeaderboardProps> = ({ isReady }) => {
   };
   
   return (
-    <div className="bg-slate-600 p-4 rounded-lg w-full animate-fade-in flex flex-col flex-grow">
+    // This is the main component container. It grows to fill the space left by the tabs.
+    // It's a flex column, so its children can be controlled with flex properties.
+    <div className="bg-slate-600 p-4 rounded-lg w-full animate-fade-in flex flex-col flex-grow min-h-0">
+      
+      {/* --- STATIC HEADER --- */}
+      {/* This block contains the title and column headers. It will not scroll. */}
+      {/* `flex-shrink-0` prevents it from shrinking if content overflows. */}
+      <div className="flex-shrink-0">
+        <h2 className="text-2xl font-bold text-center mb-4">Leaderboard</h2>
+        <div className="grid grid-cols-3 gap-2 px-3 text-sm text-slate-400 font-bold mb-2">
+          <span>Rank</span>
+          <span className="text-center">Player</span>
+          <span className="text-right">Score</span>
+        </div>
+      </div>
+
       {/* --- SCROLLABLE CONTENT --- */}
+      {/* This container will take up all remaining vertical space (`flex-grow`). */}
+      {/* `overflow-y-auto` makes it scrollable only when its content is too tall. */}
+      {/* `min-h-0` is crucial in a flex column to allow shrinking. */}
       <div className="flex-grow overflow-y-auto min-h-0">
-        {renderList()}
+        {renderContent()}
       </div>
     </div>
   );
