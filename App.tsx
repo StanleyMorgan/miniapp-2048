@@ -96,6 +96,7 @@ const App: React.FC = () => {
                     onSubmitScore={submitScore}
                     isSubmitting={isSubmitting}
                     hasSubmittedScore={hasSubmittedScore}
+                    isNewBestScore={score > bestScore}
                   />
                 )}
               </div>
