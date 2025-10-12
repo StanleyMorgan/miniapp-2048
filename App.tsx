@@ -15,7 +15,8 @@ const App: React.FC = () => {
   const { 
     tiles, 
     score, 
-    bestScore, 
+    bestScore,
+    serverBestScore,
     isGameOver, 
     newGame, 
     handleKeyDown, 
@@ -71,6 +72,13 @@ const App: React.FC = () => {
 
     setTouchStart(null);
   };
+  
+  // A new best score is achieved if the server score is known and beaten,
+  // otherwise, it falls back to comparing against the local best score.
+  // This correctly handles logged-in users vs. anonymous users.
+  const isNewBestScore = serverBestScore !== null
+    ? score > serverBestScore
+    : score > bestScore;
 
   return (
     <div className="min-h-screen w-screen text-white flex flex-col items-center p-4 font-sans">
@@ -96,7 +104,7 @@ const App: React.FC = () => {
                     onSubmitScore={submitScore}
                     isSubmitting={isSubmitting}
                     hasSubmittedScore={hasSubmittedScore}
-                    isNewBestScore={score > bestScore}
+                    isNewBestScore={isNewBestScore && score > 0}
                   />
                 )}
               </div>

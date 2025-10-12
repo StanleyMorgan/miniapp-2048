@@ -17,6 +17,7 @@ export const useGameLogic = (isSdkReady: boolean) => {
     const savedBestScore = localStorage.getItem(BEST_SCORE_KEY);
     return savedBestScore ? parseInt(savedBestScore, 10) : 0;
   });
+  const [serverBestScore, setServerBestScore] = useState<number | null>(null);
   const [isGameOver, setIsGameOver] = useState(false);
   const [isWon, setIsWon] = useState(false);
   const [isMoving, setIsMoving] = useState(false);
@@ -46,11 +47,17 @@ export const useGameLogic = (isSdkReady: boolean) => {
   }, [score, bestScore]);
 
   useEffect(() => {
+    if (!isSdkReady) {
+      setServerBestScore(null);
+      return;
+    }
+
     const fetchUserBestScore = async () => {
       try {
         const authResult = await sdk.quickAuth.getToken();
         if (!('token' in authResult)) {
-          console.warn("Could not get auth token to fetch best score.");
+          console.warn("Could not get auth token, user may not be logged in.");
+          setServerBestScore(null);
           return;
         }
 
@@ -63,33 +70,37 @@ export const useGameLogic = (isSdkReady: boolean) => {
           const currentUserEntry = leaderboardData.find(entry => entry.isCurrentUser);
 
           if (currentUserEntry) {
+            const serverScore = currentUserEntry.score || 0;
+            setServerBestScore(serverScore);
             setBestScore(prevBest => {
-              const serverScore = currentUserEntry.score || 0;
               const newBest = Math.max(prevBest, serverScore);
               if (newBest > prevBest) {
                 localStorage.setItem(BEST_SCORE_KEY, newBest.toString());
               }
               return newBest;
             });
+          } else {
+             // User is authenticated but not on the leaderboard
+            setServerBestScore(0);
           }
         } else {
-          console.error('Failed to fetch user best score:', await response.text());
+          console.error('Failed to fetch user best score, falling back to local.', await response.text());
+          setServerBestScore(null);
         }
       } catch (error) {
-        console.error('Error fetching user best score:', error);
+        console.error('Error fetching user best score, falling back to local.', error);
+        setServerBestScore(null);
       }
     };
-
-    if (isSdkReady) {
-        fetchUserBestScore();
-    }
+    
+    fetchUserBestScore();
   }, [isSdkReady]);
 
   const submitScore = useCallback(async () => {
     if (hasSubmittedScore || isSubmitting) return;
 
     setIsSubmitting(true);
-    const BACKEND_URL = '/api/submit-score'; // Use relative path for portability
+    const BACKEND_URL = '/api/submit-score';
     console.log(`Submitting score ${score} to backend...`);
     
     try {
@@ -102,10 +113,11 @@ export const useGameLogic = (isSdkReady: boolean) => {
       if (res.ok) {
         console.log('Score submitted successfully!');
         setHasSubmittedScore(true);
+        // Update serverBestScore with the new score to prevent saving a lower score later
+        setServerBestScore(prev => Math.max(prev ?? 0, score));
       } else {
         const errorText = await res.text();
         console.error('Failed to submit score to backend:', errorText);
-        // Optionally, you could set an error state here to show in the UI
       }
     } catch (error) {
       console.error('An error occurred during score submission:', error);
@@ -190,7 +202,7 @@ export const useGameLogic = (isSdkReady: boolean) => {
     return emptyCells;
   };
 
-  return { tiles, score, bestScore, isGameOver, isWon, newGame, handleKeyDown, performMove, submitScore, isSubmitting, hasSubmittedScore };
+  return { tiles, score, bestScore, serverBestScore, isGameOver, isWon, newGame, handleKeyDown, performMove, submitScore, isSubmitting, hasSubmittedScore };
 };
 
 const GRID_SIZE = 4;
