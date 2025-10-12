@@ -83,11 +83,16 @@ const Leaderboard: React.FC<LeaderboardProps> = ({ isReady }) => {
         return <div className="text-center text-slate-400 p-8">No scores yet. Be the first!</div>;
     }
     
-    const sortedData = [...leaderboardData].sort((a, b) => a.rank - b.rank);
+    const currentUserEntry = leaderboardData.find(entry => entry.isCurrentUser);
+    const otherEntries = leaderboardData
+      .filter(entry => !entry.isCurrentUser)
+      .sort((a, b) => a.rank - b.rank);
+
+    const finalLeaderboard = currentUserEntry ? [currentUserEntry, ...otherEntries] : otherEntries;
 
     return (
       <div className="flex flex-col gap-2">
-        {sortedData.map(({ rank, displayName, fid, score, isCurrentUser }) => (
+        {finalLeaderboard.map(({ rank, displayName, fid, score, isCurrentUser }) => (
           <div 
             key={`${rank}-${fid}`} 
             className={`
@@ -98,7 +103,7 @@ const Leaderboard: React.FC<LeaderboardProps> = ({ isReady }) => {
           >
             <span className="font-bold text-orange-400">#{rank}</span>
             <span className="text-center text-white truncate" title={displayName}>
-              {isCurrentUser ? 'You' : displayName}
+              {displayName}
             </span>
             <span className="text-right font-bold text-white">{score}</span>
           </div>
@@ -108,22 +113,14 @@ const Leaderboard: React.FC<LeaderboardProps> = ({ isReady }) => {
   };
   
   return (
-    <div className="bg-slate-600 p-4 rounded-lg w-full animate-fade-in flex flex-col h-full">
-      
-      {/* --- STATIC HEADER --- */}
-      <div className="flex-shrink-0">
-        <h2 className="text-2xl font-bold text-center mb-4">Leaderboard</h2>
-        <div className="grid grid-cols-3 gap-2 px-3 text-sm text-slate-400 font-bold mb-2">
-          <span>Rank</span>
-          <span className="text-center">Player</span>
-          <span className="text-right">Score</span>
-        </div>
+    <div className="bg-slate-600 p-4 rounded-lg w-full animate-fade-in">
+      <h2 className="text-2xl font-bold text-center mb-4">Leaderboard</h2>
+      <div className="grid grid-cols-3 gap-2 px-3 text-sm text-slate-400 font-bold mb-2">
+        <span>Rank</span>
+        <span className="text-center">Player</span>
+        <span className="text-right">Score</span>
       </div>
-
-      {/* --- SCROLLABLE CONTENT --- */}
-      <div className="flex-grow overflow-y-auto min-h-0">
-        {renderContent()}
-      </div>
+      {renderContent()}
     </div>
   );
 };
