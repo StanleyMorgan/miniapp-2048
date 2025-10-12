@@ -18,6 +18,7 @@ export const useGameLogic = (isSdkReady: boolean) => {
     return savedBestScore ? parseInt(savedBestScore, 10) : 0;
   });
   const [serverBestScore, setServerBestScore] = useState<number | null>(null);
+  const [userRank, setUserRank] = useState<number | null>(null);
   const [isGameOver, setIsGameOver] = useState(false);
   const [isWon, setIsWon] = useState(false);
   const [isMoving, setIsMoving] = useState(false);
@@ -33,6 +34,7 @@ export const useGameLogic = (isSdkReady: boolean) => {
     setIsMoving(false);
     setHasSubmittedScore(false);
     setIsSubmitting(false);
+    setUserRank(null);
   }, []);
 
   useEffect(() => {
@@ -115,6 +117,27 @@ export const useGameLogic = (isSdkReady: boolean) => {
         setHasSubmittedScore(true);
         // Update serverBestScore with the new score to prevent saving a lower score later
         setServerBestScore(prev => Math.max(prev ?? 0, score));
+
+        // Fetch the user's new rank after a successful submission
+        try {
+          const authResult = await sdk.quickAuth.getToken();
+          if ('token' in authResult) {
+            const response = await fetch('/api/leaderboard', {
+              headers: { 'Authorization': `Bearer ${authResult.token}` },
+            });
+            if (response.ok) {
+              const leaderboardData: { isCurrentUser?: boolean; rank: number }[] = await response.json();
+              const currentUserEntry = leaderboardData.find(entry => entry.isCurrentUser);
+              if (currentUserEntry) {
+                console.log('Fetched new rank:', currentUserEntry.rank);
+                setUserRank(currentUserEntry.rank);
+              }
+            }
+          }
+        } catch (error) {
+          console.error("Failed to fetch user's new rank after score submission:", error);
+        }
+
       } else {
         const errorText = await res.text();
         console.error('Failed to submit score to backend:', errorText);
@@ -202,7 +225,7 @@ export const useGameLogic = (isSdkReady: boolean) => {
     return emptyCells;
   };
 
-  return { tiles, score, bestScore, serverBestScore, isGameOver, isWon, newGame, handleKeyDown, performMove, submitScore, isSubmitting, hasSubmittedScore };
+  return { tiles, score, bestScore, serverBestScore, isGameOver, isWon, newGame, handleKeyDown, performMove, submitScore, isSubmitting, hasSubmittedScore, userRank };
 };
 
 const GRID_SIZE = 4;

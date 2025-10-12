@@ -7,12 +7,16 @@ interface GameOverProps {
   isSubmitting: boolean;
   hasSubmittedScore: boolean;
   isNewBestScore: boolean;
+  userRank: number | null;
 }
 
-const GameOver: React.FC<GameOverProps> = ({ onRestart, score, onSubmitScore, isSubmitting, hasSubmittedScore, isNewBestScore }) => {
+const GameOver: React.FC<GameOverProps> = ({ onRestart, score, onSubmitScore, isSubmitting, hasSubmittedScore, isNewBestScore, userRank }) => {
   
   const handleShare = () => {
-    const text = `I just set a new high score of ${score} in the 2048 Mini App! Can you beat it?`;
+    let text = `I just set a new high score of ${score} in the 2048 Mini App! Can you beat it?`;
+    if (userRank) {
+      text = `I just reached rank #${userRank} with a score of ${score} in the 2048 Mini App! Can you beat it?`;
+    }
     const encodedText = encodeURIComponent(text);
     const appUrl = 'https://2048-base.vercel.app/'; // URL of your mini app
     const encodedAppUrl = encodeURIComponent(appUrl);
@@ -41,7 +45,7 @@ const GameOver: React.FC<GameOverProps> = ({ onRestart, score, onSubmitScore, is
               onClick={handleShare}
               className="bg-purple-600 hover:bg-purple-700 text-white font-bold py-3 px-6 rounded-lg transition-colors duration-200 text-lg"
             >
-              Share
+              Share on Farcaster
             </button>
           ) : (
             <button
