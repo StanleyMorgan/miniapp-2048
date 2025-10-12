@@ -1,19 +1,32 @@
-import React, { useState, useEffect } from 'react';
 
-interface LeaderboardProps {
-  bestScore: number;
-}
+import React, { useState, useEffect } from 'react';
+import { sdk } from '@farcaster/miniapp-sdk';
+
+interface LeaderboardProps {}
 
 type LeaderboardEntry = {
   rank: number;
-  // In a real app, your backend would resolve the FID to a username and profile picture.
-  username: string; 
-  fid?: number; // Farcaster ID
+  displayName: string; 
+  fid: number;
   score: number;
   isCurrentUser?: boolean;
 };
 
-const Leaderboard: React.FC<LeaderboardProps> = ({ bestScore }) => {
+// A simple skeleton loader component for a better UX
+const LeaderboardSkeleton: React.FC = () => (
+  <div className="flex flex-col gap-2 animate-pulse">
+    <div className="grid grid-cols-3 gap-2 px-3">
+      <div className="h-4 bg-slate-700 rounded w-1/4"></div>
+      <div className="h-4 bg-slate-700 rounded w-1/3 mx-auto"></div>
+      <div className="h-4 bg-slate-700 rounded w-1/4 ml-auto"></div>
+    </div>
+    {Array.from({ length: 5 }).map((_, i) => (
+      <div key={i} className="p-3 rounded-md bg-slate-700 h-[52px]"></div>
+    ))}
+  </div>
+);
+
+const Leaderboard: React.FC<LeaderboardProps> = () => {
   const [leaderboardData, setLeaderboardData] = useState<LeaderboardEntry[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -22,53 +35,44 @@ const Leaderboard: React.FC<LeaderboardProps> = ({ bestScore }) => {
     const fetchLeaderboard = async () => {
       setIsLoading(true);
       setError(null);
-      // This now points to the production Vercel serverless function.
-      const BACKEND_URL = 'https://2048-base.vercel.app/api/leaderboard'; 
+      const BACKEND_URL = '/api/leaderboard'; // Use relative path for Vercel deployment
 
       try {
-        const response = await fetch(BACKEND_URL);
+        // Use the authenticated fetch from the Farcaster SDK
+        const response = await sdk.quickAuth.fetch(BACKEND_URL);
         if (!response.ok) {
-          throw new Error('Network response was not ok');
+          const errorBody = await response.json().catch(() => ({ message: 'Network response was not ok' }));
+          throw new Error(errorBody.message);
         }
         const data: LeaderboardEntry[] = await response.json();
         setLeaderboardData(data);
-      } catch (err) {
-        console.warn('Failed to fetch leaderboard from backend. Using mock data as a fallback.', err);
-        setError('Could not load leaderboard.');
-
-        // MOCK DATA: Used as a fallback since the backend doesn't exist yet.
-        // This shows how the component will look with real data.
-        const mockData: LeaderboardEntry[] = [
-          { rank: 1, username: 'You', score: bestScore, isCurrentUser: true },
-          { rank: 2, username: 'vitalik.eth', fid: 2, score: 8192 },
-          { rank: 3, username: 'dwr.eth', fid: 3, score: 4096 },
-          { rank: 4, username: 'v', fid: 1, score: 2048 },
-          { rank: 5, username: 'player.eth', fid: 123, score: 1024 },
-        ];
-        
-        // Ensure the user's score is correctly placed and the list is sorted.
-        const sortedData = mockData
-          .sort((a, b) => b.score - a.score)
-          .map((item, index) => ({ ...item, rank: index + 1 }));
-
-        setLeaderboardData(sortedData);
+      } catch (err: any) {
+        console.error('Failed to fetch leaderboard:', err);
+        setError('Could not load leaderboard. Please try again later.');
       } finally {
         setIsLoading(false);
       }
     };
 
     fetchLeaderboard();
-  }, [bestScore]); // Re-fetch if bestScore changes to update the user's score in the mock data.
+  }, []);
 
   const renderContent = () => {
     if (isLoading) {
-      return <div className="text-center text-slate-400 p-8">Loading...</div>;
+      return <LeaderboardSkeleton />;
     }
 
-    if (error && leaderboardData.length === 0) {
-      return <div className="text-center text-red-400 p-8">{error}</div>;
+    if (error) {
+      return <div className="text-center text-red-400 p-8" role="alert">{error}</div>;
+    }
+
+    if (leaderboardData.length === 0) {
+        return <div className="text-center text-slate-400 p-8">No scores yet. Be the first!</div>;
     }
     
+    // Sort data to ensure user's score is in the right place if added at the end
+    const sortedData = [...leaderboardData].sort((a, b) => a.rank - b.rank);
+
     return (
       <div className="flex flex-col gap-2">
         {/* Header Row */}
@@ -79,16 +83,19 @@ const Leaderboard: React.FC<LeaderboardProps> = ({ bestScore }) => {
         </div>
         
         {/* Score Rows */}
-        {leaderboardData.map(({ rank, username, score, isCurrentUser }) => (
+        {sortedData.map(({ rank, displayName, fid, score, isCurrentUser }) => (
           <div 
-            key={rank} 
+            key={`${rank}-${fid}`} 
             className={`
               grid grid-cols-3 gap-2 p-3 rounded-md items-center text-lg
+              transition-colors duration-200
               ${isCurrentUser ? 'bg-orange-500/20 border border-orange-500' : 'bg-slate-700'}
             `}
           >
             <span className="font-bold text-orange-400">#{rank}</span>
-            <span className="text-center text-white truncate">{username}</span>
+            <span className="text-center text-white truncate" title={displayName}>
+              {isCurrentUser ? 'You' : displayName}
+            </span>
             <span className="text-right font-bold text-white">{score}</span>
           </div>
         ))}

@@ -1,3 +1,4 @@
+
 import React, { useEffect, useState, useCallback } from 'react';
 import { sdk } from '@farcaster/miniapp-sdk';
 import { useGameLogic } from './hooks/useGameLogic';
@@ -79,7 +80,7 @@ const App: React.FC = () => {
               </div>
             </div>
           ) : (
-            <Leaderboard bestScore={bestScore} />
+            <Leaderboard />
           )}
         </main>
       </div>
