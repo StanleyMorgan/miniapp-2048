@@ -33,17 +33,20 @@ export async function GET(request: Request) {
     };
     const domain = getDomain();
     
+    // Enhanced logging for debugging
+    console.log(`[leaderboard] Attempting to verify token. Domain: "${domain}". Token starts with: "${token.substring(0, 10)}..."`);
+
     try {
       const payload = await quickAuthClient.verifyJwt({ token, domain });
       currentUserFid = Number(payload.sub);
     } catch (e) {
       if (e instanceof Errors.InvalidTokenError) {
-        console.warn('Invalid auth token received:', e.message);
-        // Treat as unauthenticated, but don't fail the request
+        // Enhanced logging for debugging
+        console.error(`[leaderboard] Invalid token error for domain "${domain}". Full error:`, e);
       } else {
-        // For unexpected errors, log them but still proceed as unauthenticated
-        console.error('Unexpected error verifying JWT:', e);
+        console.error(`[leaderboard] Unexpected error verifying JWT for domain "${domain}":`, e);
       }
+      // In either case, treat as unauthenticated but don't fail the request.
     }
   }
 

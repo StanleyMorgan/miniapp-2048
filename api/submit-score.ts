@@ -12,22 +12,24 @@ export async function POST(request: Request) {
       headers: { 'Content-Type': 'application/json' },
     });
   }
+  
+  const getDomain = () => {
+    // Vercel provides the VERCEL_URL env var, which contains the domain of the deployment.
+    const vercelUrl = process.env.VERCEL_URL;
+    if (vercelUrl) {
+      return vercelUrl;
+    }
+    // Fallback for local development when not running on Vercel.
+    return 'localhost:5173';
+  };
+  const domain = getDomain();
+  const token = authorization.split(' ')[1];
+
+  // Enhanced logging for debugging
+  console.log(`[submit-score] Attempting to verify token. Domain: "${domain}". Token starts with: "${token.substring(0, 10)}..."`);
 
   try {
     // Step 1: Verify the JWT from the request header.
-    const token = authorization.split(' ')[1];
-
-    const getDomain = () => {
-      // Vercel provides the VERCEL_URL env var, which contains the domain of the deployment.
-      const vercelUrl = process.env.VERCEL_URL;
-      if (vercelUrl) {
-        return vercelUrl;
-      }
-      // Fallback for local development when not running on Vercel.
-      return 'localhost:5173';
-    };
-    const domain = getDomain();
-      
     const payload = await quickAuthClient.verifyJwt({
       token: token,
       domain: domain, 
@@ -68,15 +70,15 @@ export async function POST(request: Request) {
 
   } catch (e) {
     if (e instanceof Errors.InvalidTokenError) {
-      // If the token is invalid, return a 401 Unauthorized error.
-      console.warn('Invalid token received:', e.message);
+      // Enhanced logging for debugging
+      console.error(`[submit-score] Invalid token error for domain "${domain}". Full error:`, e);
       return new Response(JSON.stringify({ message: 'Invalid token' }), {
         status: 401,
         headers: { 'Content-Type': 'application/json' },
       });
     }
     // For any other unexpected errors, return a 500 Internal Server Error.
-    console.error('An unexpected error occurred during score submission:', e);
+    console.error(`[submit-score] An unexpected error occurred for domain "${domain}":`, e);
     return new Response(JSON.stringify({ message: 'An unexpected error occurred' }), {
       status: 500,
       headers: { 'Content-Type': 'application/json' },
