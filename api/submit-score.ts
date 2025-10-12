@@ -43,18 +43,36 @@ export async function POST(request: Request) {
         headers: { 'Content-Type': 'application/json' },
       });
     }
+
+    // Step 2: Fetch the username from a Farcaster API (e.g., Neynar's public API)
+    let username: string | null = null;
+    try {
+      const userResponse = await fetch(`https://api.neynar.com/v2/farcaster/user/bulk?fids=${fid}`);
+      if (userResponse.ok) {
+        const userData = await userResponse.json();
+        if (userData.users && userData.users.length > 0) {
+          username = userData.users[0].username;
+          console.log(`[submit-score] Fetched username "${username}" for FID ${fid}`);
+        }
+      } else {
+         console.warn(`[submit-score] Could not fetch username for FID ${fid}. Status: ${userResponse.status}`);
+      }
+    } catch (fetchError) {
+      console.error(`[submit-score] Error fetching username for FID ${fid}:`, fetchError);
+    }
     
-    // Step 2: Save the score to the database using an "UPSERT" operation.
+    // Step 3: Save the score and username to the database using an "UPSERT" operation.
     // This SQL command will INSERT a new row if the FID doesn't exist.
     // If the FID already exists (ON CONFLICT), it will UPDATE the existing row,
     // but only if the new score is greater than the current score.
     // This prevents users from submitting lower scores.
     await sql`
-      INSERT INTO scores (fid, score, updated_at)
-      VALUES (${fid}, ${score}, NOW())
+      INSERT INTO scores (fid, username, score, updated_at)
+      VALUES (${fid}, ${username}, ${score}, NOW())
       ON CONFLICT (fid)
       DO UPDATE SET
         score = EXCLUDED.score,
+        username = EXCLUDED.username,
         updated_at = NOW()
       WHERE
         scores.score < EXCLUDED.score;
