@@ -22,11 +22,16 @@ export async function GET(request: Request) {
   if (authorization && authorization.startsWith('Bearer ')) {
     const token = authorization.split(' ')[1];
     
-    // The domain for JWT verification must exactly match the domain the frontend is running on.
-    // Using the production URL is more reliable than VERCEL_URL, which can point to a temporary deployment URL.
-    const domain = process.env.NODE_ENV === 'development'
-      ? 'http://localhost:5173'
-      : 'https://2048-base.vercel.app';
+    const getDomain = () => {
+      // Vercel provides the VERCEL_URL env var, which contains the domain of the deployment.
+      const vercelUrl = process.env.VERCEL_URL;
+      if (vercelUrl) {
+        return vercelUrl;
+      }
+      // Fallback for local development when not running on Vercel.
+      return 'localhost:5173';
+    };
+    const domain = getDomain();
     
     try {
       const payload = await quickAuthClient.verifyJwt({ token, domain });
