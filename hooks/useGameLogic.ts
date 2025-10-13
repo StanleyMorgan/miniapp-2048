@@ -8,6 +8,7 @@ import {
 } from '../utils/gridUtils';
 
 const BEST_SCORE_KEY = 'bestScore2048';
+const GAME_STATE_KEY = 'gameState2048';
 const ANIMATION_DURATION = 200;
 
 export const useGameLogic = (isSdkReady: boolean) => {
@@ -37,10 +38,44 @@ export const useGameLogic = (isSdkReady: boolean) => {
     setUserRank(null);
   }, []);
 
+  // Load game from localStorage on initial mount, or start a new game.
   useEffect(() => {
+    const savedStateJSON = localStorage.getItem(GAME_STATE_KEY);
+    if (savedStateJSON) {
+      try {
+        const savedState = JSON.parse(savedStateJSON);
+        // Basic validation to make sure we're not loading corrupted data
+        if (savedState.tiles && Array.isArray(savedState.tiles) && typeof savedState.score === 'number') {
+          setTiles(savedState.tiles);
+          setScore(savedState.score);
+          setIsGameOver(savedState.isGameOver || false);
+          setIsWon(savedState.isWon || false);
+          return; // Successfully loaded, so we exit and DON'T call newGame()
+        }
+      } catch (e) {
+        console.error("Failed to parse saved game state, starting a new game.", e);
+        localStorage.removeItem(GAME_STATE_KEY); // Clear corrupted data
+      }
+    }
+    
+    // If we reach here, it means no valid saved game was found.
     newGame();
   }, [newGame]);
   
+  // Save game state to localStorage whenever it changes.
+  useEffect(() => {
+    // Do not save the initial empty state. Wait for tiles to be populated.
+    if (tiles.length > 0) {
+      const gameState = {
+        tiles,
+        score,
+        isGameOver,
+        isWon,
+      };
+      localStorage.setItem(GAME_STATE_KEY, JSON.stringify(gameState));
+    }
+  }, [tiles, score, isGameOver, isWon]);
+
   useEffect(() => {
     if (score > bestScore) {
       setBestScore(score);
