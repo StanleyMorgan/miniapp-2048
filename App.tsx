@@ -94,6 +94,11 @@ const App: React.FC = () => {
     }
   }, [isGameOver, isNewBestScore, score]);
 
+  // Determine which "best score" to display in the top controls.
+  // If the user is authenticated (serverBestScore is not null), we show their official score from the leaderboard.
+  // Otherwise, we fall back to the locally stored best score.
+  const displayBestScore = serverBestScore !== null ? serverBestScore : bestScore;
+
 
   return (
     <div className="min-h-screen w-screen text-white flex flex-col items-center p-4 font-sans">
@@ -108,7 +113,7 @@ const App: React.FC = () => {
               onTouchStart={handleTouchStart}
               onTouchEnd={handleTouchEnd}
             >
-              <GameControls score={score} bestScore={bestScore} onNewGame={newGame} />
+              <GameControls score={score} bestScore={displayBestScore} onNewGame={newGame} />
               
               <div className="relative w-full">
                 <GameBoard tiles={tiles} />
