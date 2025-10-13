@@ -33,12 +33,17 @@ const GameOver: React.FC<GameOverProps> = ({ onRestart, score, onSubmitScore, is
       {isNewBestScore && <p className="text-xl text-orange-400 font-bold mb-1">New Best Score!</p>}
       <p className="text-lg text-slate-300 mb-6">Your score: {score}</p>
       <div className="flex gap-4">
-        <button
-          onClick={onRestart}
-          className="bg-slate-500 hover:bg-slate-600 text-white font-bold py-3 px-6 rounded-lg transition-colors duration-200 text-lg"
-        >
-          Try Again
-        </button>
+        {/* Show "Try Again" if it's not a new best score, OR if the new score has already been submitted. */}
+        {(!isNewBestScore || hasSubmittedScore) && (
+          <button
+            onClick={onRestart}
+            className="bg-slate-500 hover:bg-slate-600 text-white font-bold py-3 px-6 rounded-lg transition-colors duration-200 text-lg"
+          >
+            Try Again
+          </button>
+        )}
+        
+        {/* Show "Save Score" or "Share" flow only when it's a new best score. */}
         {isNewBestScore && (
           hasSubmittedScore ? (
              <button
