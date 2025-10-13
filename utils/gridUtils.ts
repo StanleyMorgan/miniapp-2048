@@ -69,8 +69,8 @@ const slideAndMergeRow = (row: (TileData | null)[]) => {
       winner.isMerged = true;
       scoreIncrease += winner.value;
 
-      loser.row = winner.row;
-      loser.col = winner.col;
+      // Tag the loser with the winner's ID to correctly position it for animation later.
+      loser.winnerId = winner.id;
       mergedTiles.push(loser);
     }
   }
@@ -88,7 +88,7 @@ export const move = (
     tiles: TileData[], 
     direction: 'up' | 'down' | 'left' | 'right'
 ) => {
-    const workingTiles = tiles.map(t => ({ ...t, isNew: false, isMerged: false }));
+    const workingTiles = tiles.map(t => ({ ...t, isNew: false, isMerged: false, winnerId: undefined }));
 
     let grid: (TileData | null)[][] = Array(GRID_SIZE).fill(null).map(() => Array(GRID_SIZE).fill(null));
     workingTiles.forEach(t => { grid[t.row][t.col] = t; });
@@ -131,9 +131,10 @@ export const move = (
         }
     }
     
+    // Ensure "loser" tiles animate to the correct final position of the "winner" tile.
     allMergedTiles.forEach(loser => {
-      const winner = finalTiles.find(t => t.id === loser.id);
-      if(winner) {
+      const winner = finalTiles.find(t => t.id === loser.winnerId);
+      if (winner) {
           loser.row = winner.row;
           loser.col = winner.col;
       }

@@ -6,6 +6,7 @@ export interface TileData {
   col: number;
   isNew?: boolean;
   isMerged?: boolean;
+  winnerId?: number;
 }
 
 export type Grid = (number | null)[][];
