@@ -25,7 +25,6 @@
     "tagline": "Get to the 2048 tile!",
     "ogTitle": "2048 Mini App on Base",
     "ogDescription": "Play the classic 2048 puzzle game directly on Farcaster.",
-    "ogImageUrl": "https://2048-base.vercel.app/embed.png",
-    "noindex": true
+    "ogImageUrl": "https://2048-base.vercel.app/embed.png"
   }
 }
