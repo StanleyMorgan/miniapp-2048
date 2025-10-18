@@ -6,10 +6,12 @@ import GameControls from './components/GameControls';
 import GameOver from './components/GameOver';
 import Tabs from './components/Tabs';
 import Leaderboard from './components/Leaderboard';
+import SeasonSelector, { Season } from './components/SeasonSelector';
 
 const App: React.FC = () => {
   const [touchStart, setTouchStart] = useState<{x: number, y: number} | null>(null);
   const [activeTab, setActiveTab] = useState<'game' | 'top'>('game');
+  const [activeSeason, setActiveSeason] = useState<Season>('farcaster');
   const [isSdkReady, setIsSdkReady] = useState(false);
   const [shouldShowSaveFlow, setShouldShowSaveFlow] = useState(false);
 
@@ -104,6 +106,7 @@ const App: React.FC = () => {
     <div className="min-h-screen w-screen text-white flex flex-col items-center p-4 font-sans">
       <div className="w-full sm:max-w-md mx-auto flex flex-col flex-grow">
         <Tabs activeTab={activeTab} onTabChange={setActiveTab} />
+        <SeasonSelector activeSeason={activeSeason} onSeasonChange={setActiveSeason} />
         
         <main className={`flex-grow flex flex-col w-full ${activeTab === 'game' ? 'items-center justify-center' : ''}`}>
           {activeTab === 'game' ? (
