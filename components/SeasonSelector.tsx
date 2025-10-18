@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 
 export type Season = 'farcaster' | 'base-s0' | 'celo-s0';
 
@@ -14,26 +14,64 @@ const seasons: { id: Season; name: string }[] = [
 ];
 
 const SeasonSelector: React.FC<SeasonSelectorProps> = ({ activeSeason, onSeasonChange }) => {
+  const [isOpen, setIsOpen] = useState(false);
+  const wrapperRef = useRef<HTMLDivElement>(null);
+
+  const activeSeasonName = seasons.find(s => s.id === activeSeason)?.name || 'Select Season';
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (wrapperRef.current && !wrapperRef.current.contains(event.target as Node)) {
+        setIsOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, []);
+
+  const handleOptionClick = (seasonId: Season) => {
+    onSeasonChange(seasonId);
+    setIsOpen(false);
+  };
+
   return (
-    <div className="w-full mb-4">
-      <label htmlFor="season-select" className="sr-only">Select Season</label>
-      <select
-        id="season-select"
-        value={activeSeason}
-        onChange={(e) => onSeasonChange(e.target.value as Season)}
-        className="w-full bg-slate-700 text-slate-300 p-3 rounded-lg border-2 border-slate-600 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500 transition-colors appearance-none text-center uppercase font-bold focus:text-white"
-        style={{
-          background: 'url(\'data:image/svg+xml;charset=UTF-8,%3csvg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"%3e%3cpolyline points="6 9 12 15 18 9"%3e%3c/polyline%3e%3c/svg%3e\') no-repeat right 1rem center/1.5em',
-          backgroundOrigin: 'content-box',
-          backgroundColor: '#334155' // bg-slate-700
-        }}
+    <div ref={wrapperRef} className="relative w-full mb-4">
+      <button
+        type="button"
+        onClick={() => setIsOpen(!isOpen)}
+        className="w-full bg-slate-700 text-slate-300 p-3 rounded-lg border-2 border-slate-600 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500 transition-colors uppercase font-bold focus:text-white flex justify-between items-center"
+        aria-haspopup="listbox"
+        aria-expanded={isOpen}
       >
-        {seasons.map(season => (
-          <option key={season.id} value={season.id} className="bg-slate-700 text-white font-bold">
-            {season.name}
-          </option>
-        ))}
-      </select>
+        <span>{activeSeasonName}</span>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={`h-6 w-6 transition-transform duration-200 ${isOpen ? 'transform rotate-180' : ''}`}>
+          <polyline points="6 9 12 15 18 9"></polyline>
+        </svg>
+      </button>
+
+      {isOpen && (
+        <div 
+          className="absolute top-full mt-1 w-full bg-slate-700 border-2 border-slate-600 rounded-lg z-40 overflow-hidden shadow-lg animate-fade-in"
+          style={{ animationDuration: '150ms' }}
+          role="listbox"
+        >
+          {seasons.map(season => (
+            <button
+              key={season.id}
+              onClick={() => handleOptionClick(season.id)}
+              className={`w-full text-left p-3 uppercase font-bold text-slate-300 hover:bg-slate-600 hover:text-white transition-colors
+                ${activeSeason === season.id ? 'bg-orange-500/20 text-orange-400' : ''}`
+              }
+              role="option"
+              aria-selected={activeSeason === season.id}
+            >
+              {season.name}
+            </button>
+          ))}
+        </div>
+      )}
     </div>
   );
 };
