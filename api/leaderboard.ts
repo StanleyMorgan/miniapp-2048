@@ -11,6 +11,7 @@ type LeaderboardEntry = {
   displayName: string;
   fid: number;
   score: number;
+  primaryAddress: string | null;
   isCurrentUser?: boolean;
 };
 
@@ -54,6 +55,7 @@ export async function GET(request: Request) {
         fid, 
         score,
         username,
+        primary_address,
         RANK() OVER (ORDER BY score DESC) as rank
       FROM scores 
       LIMIT 20;
@@ -64,6 +66,7 @@ export async function GET(request: Request) {
       displayName: row.username || `fid:${row.fid}`,
       fid: Number(row.fid),
       score: row.score,
+      primaryAddress: row.primary_address || null,
       isCurrentUser: currentUserFid !== null && Number(row.fid) === currentUserFid,
     }));
 
@@ -76,7 +79,7 @@ export async function GET(request: Request) {
         // Use two simple queries for reliability.
         // First, get the user's data.
         const { rows: userRows } = await sql`
-          SELECT score, username FROM scores WHERE fid = ${currentUserFid};
+          SELECT score, username, primary_address FROM scores WHERE fid = ${currentUserFid};
         `;
 
         if (userRows.length > 0) {
@@ -93,6 +96,7 @@ export async function GET(request: Request) {
             displayName: user.username || `fid:${currentUserFid}`,
             fid: currentUserFid,
             score: user.score,
+            primaryAddress: user.primary_address || null,
             isCurrentUser: true,
           });
         }

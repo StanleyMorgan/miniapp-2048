@@ -60,19 +60,37 @@ export async function POST(request: Request) {
     } catch (fetchError) {
       console.error(`[submit-score] Error fetching username for FID ${fid}:`, fetchError);
     }
+
+    // Step 3: Fetch the user's primary Ethereum address.
+    let primaryAddress: string | null = null;
+    try {
+      const addressResponse = await fetch(`https://api.farcaster.xyz/fc/primary-address?fid=${fid}&protocol=ethereum`);
+      if (addressResponse.ok) {
+        const addressData = await addressResponse.json();
+        if (addressData.result && addressData.result.address) {
+          primaryAddress = addressData.result.address.address;
+          console.log(`[submit-score] Fetched primary address "${primaryAddress}" for FID ${fid}`);
+        }
+      } else {
+        console.warn(`[submit-score] Could not fetch primary address for FID ${fid}. Status: ${addressResponse.status}`);
+      }
+    } catch (fetchError) {
+       console.error(`[submit-score] Error fetching primary address for FID ${fid}:`, fetchError);
+    }
     
-    // Step 3: Save the score and username to the database using an "UPSERT" operation.
+    // Step 4: Save the score, username, and address to the database using an "UPSERT" operation.
     // This SQL command will INSERT a new row if the FID doesn't exist.
     // If the FID already exists (ON CONFLICT), it will UPDATE the existing row,
     // but only if the new score is greater than the current score.
     // This prevents users from submitting lower scores.
     await sql`
-      INSERT INTO scores (fid, username, score, updated_at)
-      VALUES (${fid}, ${username}, ${score}, NOW())
+      INSERT INTO scores (fid, username, score, primary_address, updated_at)
+      VALUES (${fid}, ${username}, ${score}, ${primaryAddress}, NOW())
       ON CONFLICT (fid)
       DO UPDATE SET
         score = EXCLUDED.score,
         username = EXCLUDED.username,
+        primary_address = EXCLUDED.primary_address,
         updated_at = NOW()
       WHERE
         scores.score < EXCLUDED.score;
