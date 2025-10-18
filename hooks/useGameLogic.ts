@@ -5,6 +5,8 @@ import {
   generateInitialTiles,
   move,
   isGameOver as checkIsGameOver,
+  addRandomTile,
+  SeededRandom,
 } from '../utils/gridUtils';
 
 const BEST_SCORE_KEY = 'bestScore2048';
@@ -16,7 +18,7 @@ export const useGameLogic = (isSdkReady: boolean) => {
   const [userAddress, setUserAddress] = useState<string | null>(null);
   const [tiles, setTiles] = useState<TileData[]>([]);
   const [score, setScore] = useState(0);
-  const [bestScore, setBestScore] = useState(0); // Initialized lazily later
+  const [bestScore, setBestScore] = useState(0);
   const [serverBestScore, setServerBestScore] = useState<number | null>(null);
   const [userRank, setUserRank] = useState<number | null>(null);
   const [isGameOver, setIsGameOver] = useState(false);
@@ -24,20 +26,58 @@ export const useGameLogic = (isSdkReady: boolean) => {
   const [isMoving, setIsMoving] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [hasSubmittedScore, setHasSubmittedScore] = useState(false);
+  
+  // State for deterministic gameplay, as per the new architecture
+  const [seed, setSeed] = useState<string | null>(null);
+  const [startTime, setStartTime] = useState<number | null>(null);
+  const [moves, setMoves] = useState<number[]>([]); // 0:up, 1:right, 2:down, 3:left
+  const [prng, setPrng] = useState<SeededRandom | null>(null);
 
-  const newGame = useCallback(() => {
-    // This function can now rely on `userAddress` being available in the hook's scope.
-    // For example: const seed = createSeed(userAddress, Date.now());
-    const { initialTiles } = generateInitialTiles();
-    setTiles(initialTiles);
-    setScore(0);
-    setIsGameOver(false);
-    setIsWon(false);
-    setIsMoving(false);
-    setHasSubmittedScore(false);
-    setIsSubmitting(false);
-    setUserRank(null);
-  }, [userAddress]); // Dependency on userAddress for potential seed generation logic.
+  const newGame = useCallback(async () => {
+    setIsMoving(true); // Use isMoving as a loading state for new game creation
+    
+    try {
+      // 1. Fetch randomness and server time for seed generation
+      const response = await fetch('/api/start-game');
+      if (!response.ok) {
+        throw new Error('Failed to start a new game session.');
+      }
+      const { randomness, startTime: newStartTime } = await response.json();
+
+      // 2. Create the deterministic seed
+      const dataToHash = `${randomness}${userAddress ?? ''}${newStartTime}`;
+      const encoder = new TextEncoder();
+      const data = encoder.encode(dataToHash);
+      const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+      const hashArray = Array.from(new Uint8Array(hashBuffer));
+      const newSeed = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+
+      // 3. Initialize PRNG with the new seed
+      const newPrng = new SeededRandom(newSeed);
+
+      // 4. Generate initial tiles using the PRNG
+      const { initialTiles } = generateInitialTiles(newPrng);
+      
+      // 5. Set all new states
+      setSeed(newSeed);
+      setStartTime(newStartTime);
+      setPrng(newPrng);
+      setMoves([]);
+      setTiles(initialTiles);
+      setScore(0);
+      setIsGameOver(false);
+      setIsWon(false);
+      setHasSubmittedScore(false);
+      setIsSubmitting(false);
+      setUserRank(null);
+
+    } catch (error) {
+      console.error("Error starting new game:", error);
+      // Handle error, maybe show a toast to the user
+    } finally {
+      setIsMoving(false);
+    }
+  }, [userAddress]);
 
   useEffect(() => {
     if (!isSdkReady) return;
@@ -45,45 +85,37 @@ export const useGameLogic = (isSdkReady: boolean) => {
     const initializeGame = async () => {
       setIsInitializing(true);
       
-      // Step 1: Fetch user info (including address)
       try {
         const res = await sdk.quickAuth.fetch('/api/user-info');
         if (res.ok) {
           const data = await res.json();
           setUserAddress(data.primaryAddress || null);
-          console.log('User Address Initialized:', data.primaryAddress);
-        } else {
-          console.warn('Could not fetch user info.');
         }
       } catch (error) {
         console.error('Error fetching user info:', error);
       }
 
-      // Step 2: Initialize scores (local and server)
       const localBest = parseInt(localStorage.getItem(BEST_SCORE_KEY) || '0', 10);
       let finalBestScore = localBest;
 
       try {
-        const authResult = await sdk.quickAuth.getToken();
-        if ('token' in authResult) {
-          const response = await fetch('/api/leaderboard', {
-            headers: { 'Authorization': `Bearer ${authResult.token}` },
-          });
-          if (response.ok) {
-            const leaderboardData: { isCurrentUser?: boolean; score: number }[] = await response.json();
-            const currentUserEntry = leaderboardData.find(entry => entry.isCurrentUser);
-            if (currentUserEntry) {
-              const serverScore = currentUserEntry.score || 0;
-              setServerBestScore(serverScore);
-              finalBestScore = Math.max(localBest, serverScore);
-            } else {
-              setServerBestScore(0); // Authenticated but no score yet.
+          const authResult = await sdk.quickAuth.getToken();
+          if ('token' in authResult) {
+            const response = await fetch('/api/leaderboard', { headers: { 'Authorization': `Bearer ${authResult.token}` } });
+            if (response.ok) {
+              const leaderboardData: { isCurrentUser?: boolean; score: number }[] = await response.json();
+              const currentUserEntry = leaderboardData.find(entry => entry.isCurrentUser);
+              if (currentUserEntry) {
+                setServerBestScore(currentUserEntry.score || 0);
+                finalBestScore = Math.max(localBest, currentUserEntry.score || 0);
+              } else {
+                setServerBestScore(0);
+              }
             }
           }
-        }
       } catch (error) {
         console.error('Error fetching server best score:', error);
-        setServerBestScore(null); // Fallback to local
+        setServerBestScore(null);
       }
 
       setBestScore(finalBestScore);
@@ -91,17 +123,30 @@ export const useGameLogic = (isSdkReady: boolean) => {
         localStorage.setItem(BEST_SCORE_KEY, finalBestScore.toString());
       }
       
-      // Step 3: Load saved game state or start a new game
       const savedStateJSON = localStorage.getItem(GAME_STATE_KEY);
       let loadedFromSave = false;
       if (savedStateJSON) {
         try {
           const savedState = JSON.parse(savedStateJSON);
-          if (savedState.tiles && Array.isArray(savedState.tiles) && typeof savedState.score === 'number') {
+          if (savedState.seed) { // Check for new state structure
             setTiles(savedState.tiles);
             setScore(savedState.score);
             setIsGameOver(savedState.isGameOver || false);
             setIsWon(savedState.isWon || false);
+            setSeed(savedState.seed);
+            setStartTime(savedState.startTime);
+            setMoves(savedState.moves);
+            
+            // Re-create the PRNG and fast-forward it to the correct state
+            const loadedPrng = new SeededRandom(savedState.seed);
+            // Each new tile generation consumes 2 random numbers (position and value)
+            // Initial generation is 2 tiles = 4 calls. Each subsequent move is 1 tile = 2 calls.
+            const prngCalls = 4 + (savedState.moves.length * 2);
+            for (let i = 0; i < prngCalls; i++) {
+              loadedPrng.next();
+            }
+            setPrng(loadedPrng);
+
             loadedFromSave = true;
           }
         } catch (e) {
@@ -111,7 +156,7 @@ export const useGameLogic = (isSdkReady: boolean) => {
       }
 
       if (!loadedFromSave) {
-        newGame();
+        await newGame();
       }
 
       setIsInitializing(false);
@@ -120,19 +165,20 @@ export const useGameLogic = (isSdkReady: boolean) => {
     initializeGame();
   }, [isSdkReady, newGame]);
   
-  // Save game state to localStorage whenever it changes.
   useEffect(() => {
-    // Do not save during initialization or if tiles are not populated.
-    if (!isInitializing && tiles.length > 0) {
+    if (!isInitializing && tiles.length > 0 && seed) {
       const gameState = {
         tiles,
         score,
         isGameOver,
         isWon,
+        seed,
+        startTime,
+        moves,
       };
       localStorage.setItem(GAME_STATE_KEY, JSON.stringify(gameState));
     }
-  }, [tiles, score, isGameOver, isWon, isInitializing]);
+  }, [tiles, score, isGameOver, isWon, isInitializing, seed, startTime, moves]);
 
   useEffect(() => {
     if (score > bestScore) {
@@ -144,57 +190,46 @@ export const useGameLogic = (isSdkReady: boolean) => {
 
   const submitScore = useCallback(async () => {
     if (hasSubmittedScore || isSubmitting) return;
-
     setIsSubmitting(true);
-    const BACKEND_URL = '/api/submit-score';
+    // Here you would eventually send the seed, moves, startTime etc. to the contract
+    // For now, it just submits the score to the backend leaderboard.
     console.log(`Submitting score ${score} to backend...`);
+    console.log('Game Data:', { seed, startTime, moves });
     
     try {
-      const res = await sdk.quickAuth.fetch(BACKEND_URL, {
+      const res = await sdk.quickAuth.fetch('/api/submit-score', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ score }),
       });
 
       if (res.ok) {
-        console.log('Score submitted successfully!');
         setHasSubmittedScore(true);
-        // Update serverBestScore with the new score to prevent saving a lower score later
         setServerBestScore(prev => Math.max(prev ?? 0, score));
-
-        // Fetch the user's new rank after a successful submission
+        // Fetch rank after submission
         try {
           const authResult = await sdk.quickAuth.getToken();
           if ('token' in authResult) {
-            const response = await fetch('/api/leaderboard', {
-              headers: { 'Authorization': `Bearer ${authResult.token}` },
-            });
+            const response = await fetch('/api/leaderboard', { headers: { 'Authorization': `Bearer ${authResult.token}` } });
             if (response.ok) {
               const leaderboardData: { isCurrentUser?: boolean; rank: number }[] = await response.json();
               const currentUserEntry = leaderboardData.find(entry => entry.isCurrentUser);
-              if (currentUserEntry) {
-                console.log('Fetched new rank:', currentUserEntry.rank);
-                setUserRank(currentUserEntry.rank);
-              }
+              if (currentUserEntry) setUserRank(currentUserEntry.rank);
             }
           }
-        } catch (error) {
-          console.error("Failed to fetch user's new rank after score submission:", error);
-        }
-
+        } catch (e) { console.error("Failed to fetch new rank", e); }
       } else {
-        const errorText = await res.text();
-        console.error('Failed to submit score to backend:', errorText);
+        console.error('Failed to submit score:', await res.text());
       }
     } catch (error) {
-      console.error('An error occurred during score submission:', error);
+      console.error('Error during score submission:', error);
     } finally {
       setIsSubmitting(false);
     }
-  }, [score, hasSubmittedScore, isSubmitting]);
+  }, [score, hasSubmittedScore, isSubmitting, seed, startTime, moves]);
 
   const performMove = useCallback((direction: 'up' | 'down' | 'left' | 'right') => {
-    if (isGameOver || isMoving) return;
+    if (isGameOver || isMoving || !prng) return;
 
     const { newTiles, mergedTiles, scoreIncrease, hasMoved } = move(tiles, direction);
     
@@ -203,14 +238,16 @@ export const useGameLogic = (isSdkReady: boolean) => {
         setScore(prev => prev + scoreIncrease);
         setTiles([...newTiles, ...mergedTiles]);
 
+        const directionMap = { 'up': 0, 'right': 1, 'down': 2, 'left': 3 };
+        setMoves(prevMoves => [...prevMoves, directionMap[direction]]);
+
         setTimeout(() => {
           const tilesAfterAnimation = newTiles.map(t => ({ ...t, isMerged: false }));
-          const finalTiles = addRandomTile(tilesAfterAnimation);
+          const finalTiles = addRandomTile(tilesAfterAnimation, prng);
           setTiles(finalTiles);
           setIsMoving(false);
 
-          const has2048 = finalTiles.some(tile => tile.value === 2048);
-          if (!isWon && has2048) {
+          if (!isWon && finalTiles.some(tile => tile.value === 2048)) {
               setIsWon(true);
           }
   
@@ -219,7 +256,7 @@ export const useGameLogic = (isSdkReady: boolean) => {
           }
         }, ANIMATION_DURATION);
     }
-  }, [tiles, isGameOver, isMoving, isWon]);
+  }, [tiles, isGameOver, isMoving, isWon, prng]);
 
   const handleKeyDown = useCallback((e: KeyboardEvent) => {
     let direction: 'up' | 'down' | 'left' | 'right' | null = null;
@@ -234,43 +271,5 @@ export const useGameLogic = (isSdkReady: boolean) => {
     performMove(direction);
   }, [performMove]);
 
-  const addRandomTile = (currentTiles: TileData[]): TileData[] => {
-    const grid = tilesToGrid(currentTiles);
-    const emptyCells = getEmptyCells(grid);
-    if (emptyCells.length === 0) return currentTiles;
-  
-    const { row, col } = emptyCells[Math.floor(Math.random() * emptyCells.length)];
-    const value = Math.random() < 0.9 ? 2 : 4;
-    
-    const newId = Math.max(0, ...currentTiles.map(t => t.id)) + 1;
-    const newTile: TileData = { id: newId, value, row, col, isNew: true };
-    return [...currentTiles, newTile];
-  };
-
-  const tilesToGrid = (tiles: TileData[]): Grid => {
-    const grid: Grid = Array(GRID_SIZE).fill(null).map(() => Array(GRID_SIZE).fill(null));
-    tiles.forEach(tile => {
-      if (grid[tile.row] && grid[tile.row][tile.col] === null) {
-        grid[tile.row][tile.col] = tile.value;
-      }
-    });
-    return grid;
-  };
-
-  const getEmptyCells = (grid: Grid): { row: number; col: number }[] => {
-    const emptyCells: { row: number; col: number }[] = [];
-    for (let r = 0; r < GRID_SIZE; r++) {
-      for (let c = 0; c < GRID_SIZE; c++) {
-        if (grid[r][c] === null) {
-          emptyCells.push({ row: r, col: c });
-        }
-      }
-    }
-    return emptyCells;
-  };
-
   return { tiles, score, bestScore, serverBestScore, isGameOver, isWon, newGame, handleKeyDown, performMove, submitScore, isSubmitting, hasSubmittedScore, userRank, isInitializing, userAddress };
 };
-
-const GRID_SIZE = 4;
-type Grid = (number | null)[][];

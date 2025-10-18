@@ -3,6 +3,38 @@ import type { TileData, Grid } from '../types';
 const GRID_SIZE = 4;
 let tileIdCounter = 1;
 
+/**
+ * A simple seeded pseudo-random number generator (PRNG) using LCG algorithm.
+ * This ensures that the sequence of "random" numbers is the same for a given seed,
+ * making the game's tile generation deterministic and verifiable.
+ */
+export class SeededRandom {
+  private seed: number;
+  private readonly a = 1664525;
+  private readonly c = 1013904223;
+  private readonly m = 2 ** 32;
+
+  constructor(seedStr: string) {
+    // Simple hash function to turn a string seed into a starting number.
+    let hash = 0;
+    for (let i = 0; i < seedStr.length; i++) {
+      const char = seedStr.charCodeAt(i);
+      hash = ((hash << 5) - hash) + char;
+      hash |= 0; // Convert to 32bit integer
+    }
+    this.seed = hash;
+  }
+
+  /**
+   * Generates the next pseudo-random number in the sequence.
+   * @returns A floating-point number between 0 (inclusive) and 1 (exclusive).
+   */
+  public next(): number {
+    this.seed = (this.a * this.seed + this.c) % this.m;
+    return this.seed / this.m;
+  }
+}
+
 const tilesToGrid = (tiles: TileData[]): Grid => {
   const grid: Grid = Array(GRID_SIZE).fill(null).map(() => Array(GRID_SIZE).fill(null));
   tiles.forEach(tile => {
@@ -25,23 +57,38 @@ const getEmptyCells = (grid: Grid): { row: number; col: number }[] => {
   return emptyCells;
 };
 
-const addInitialTile = (tiles: TileData[]): TileData[] => {
+/**
+ * Adds a new random tile (2 or 4) to an empty cell on the grid.
+ * The position and value of the tile are determined by the provided PRNG.
+ * @param tiles The current array of tiles.
+ * @param prng The seeded random number generator instance.
+ * @returns A new array of tiles including the newly added one.
+ */
+export const addRandomTile = (tiles: TileData[], prng: SeededRandom): TileData[] => {
   const grid = tilesToGrid(tiles);
   const emptyCells = getEmptyCells(grid);
   if (emptyCells.length === 0) return tiles;
 
-  const { row, col } = emptyCells[Math.floor(Math.random() * emptyCells.length)];
-  const value = Math.random() < 0.9 ? 2 : 4;
+  const cellIndex = Math.floor(prng.next() * emptyCells.length);
+  const { row, col } = emptyCells[cellIndex];
+  
+  // The value is 2 with 90% probability, and 4 with 10% probability.
+  const value = prng.next() < 0.9 ? 2 : 4;
   
   const newTile: TileData = { id: tileIdCounter++, value, row, col, isNew: true };
   return [...tiles, newTile];
 };
 
-export const generateInitialTiles = () => {
+/**
+ * Generates the initial two tiles for a new game.
+ * @param prng The seeded random number generator to ensure determinism.
+ * @returns An object containing the array of initial tiles.
+ */
+export const generateInitialTiles = (prng: SeededRandom) => {
   tileIdCounter = 1;
   let initialTiles: TileData[] = [];
-  initialTiles = addInitialTile(initialTiles);
-  initialTiles = addInitialTile(initialTiles);
+  initialTiles = addRandomTile(initialTiles, prng);
+  initialTiles = addRandomTile(initialTiles, prng);
   return { initialTiles };
 };
 
@@ -69,7 +116,6 @@ const slideAndMergeRow = (row: (TileData | null)[]) => {
       winner.isMerged = true;
       scoreIncrease += winner.value;
 
-      // Tag the loser with the winner's ID to correctly position it for animation later.
       loser.winnerId = winner.id;
       mergedTiles.push(loser);
     }
@@ -77,7 +123,7 @@ const slideAndMergeRow = (row: (TileData | null)[]) => {
 
   const newRow: (TileData | null)[] = Array(GRID_SIZE).fill(null);
   filtered.forEach((tile, i) => {
-    tile.col = i; // Update column for sliding
+    tile.col = i;
     newRow[i] = tile;
   });
 
@@ -109,7 +155,6 @@ export const move = (
     const allMergedTiles: TileData[] = [];
 
     grid = grid.map((row, rowIndex) => {
-        // Update row property for all tiles before sliding
         row.forEach(tile => { if (tile) tile.row = rowIndex; });
         const { newRow, scoreIncrease, mergedTiles } = slideAndMergeRow(row);
         totalScoreIncrease += scoreIncrease;
@@ -131,7 +176,6 @@ export const move = (
         }
     }
     
-    // Ensure "loser" tiles animate to the correct final position of the "winner" tile.
     allMergedTiles.forEach(loser => {
       const winner = finalTiles.find(t => t.id === loser.winnerId);
       if (winner) {
@@ -158,7 +202,7 @@ export const isGameOver = (tiles: TileData[]): boolean => {
     for (let r = 0; r < GRID_SIZE; r++) {
         for (let c = 0; c < GRID_SIZE; c++) {
             const val = grid[r][c];
-            if (val === null) return false; // Should not happen if length is 16, but good for safety
+            if (val === null) return false;
             if (r + 1 < GRID_SIZE && grid[r + 1][c] === val) return false;
             if (c + 1 < GRID_SIZE && grid[r][c + 1] === val) return false;
         }
