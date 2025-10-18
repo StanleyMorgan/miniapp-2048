@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 
-export type Season = 'farcaster' | 'base-s0' | 'celo-s0';
+export type Season = 'farcaster' | 'base-s0' | 'celo-s0' | 'monad-s0';
 
 interface SeasonSelectorProps {
   activeSeason: Season;
@@ -9,6 +9,7 @@ interface SeasonSelectorProps {
 
 const seasons: { id: Season; name: string }[] = [
   { id: 'farcaster', name: 'FARCASTER' },
+  { id: 'monad-s0', name: 'MONAD S0' },
   { id: 'base-s0', name: 'BASE S0' },
   { id: 'celo-s0', name: 'CELO S0' },
 ];
