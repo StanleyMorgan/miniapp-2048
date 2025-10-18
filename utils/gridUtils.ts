@@ -38,7 +38,7 @@ export class SeededRandom {
 const tilesToGrid = (tiles: TileData[]): Grid => {
   const grid: Grid = Array(GRID_SIZE).fill(null).map(() => Array(GRID_SIZE).fill(null));
   tiles.forEach(tile => {
-    if (grid[tile.row] && grid[tile.row][tile.col] === null) {
+    if (tile && grid[tile.row] && grid[tile.row][tile.col] === null) {
       grid[tile.row][tile.col] = tile.value;
     }
   });
@@ -107,24 +107,34 @@ const slideAndMergeRow = (row: (TileData | null)[]) => {
   const mergedTiles: TileData[] = [];
   let scoreIncrease = 0;
 
-  for (let i = 0; i < filtered.length - 1; i++) {
-    if (filtered[i].value === filtered[i + 1].value) {
+  const newFiltered: TileData[] = [];
+  let i = 0;
+  while (i < filtered.length) {
+    if (i + 1 < filtered.length && filtered[i].value === filtered[i + 1].value) {
       const winner = filtered[i];
-      const loser = filtered.splice(i + 1, 1)[0];
-      
+      const loser = filtered[i + 1];
+
+      // Mutate the winner tile
       winner.value *= 2;
       winner.isMerged = true;
       scoreIncrease += winner.value;
 
+      // Mark the loser for removal and animation
       loser.winnerId = winner.id;
       mergedTiles.push(loser);
+
+      newFiltered.push(winner);
+      i += 2; // Skip both tiles
+    } else {
+      newFiltered.push(filtered[i]);
+      i += 1; // Move to next tile
     }
   }
 
   const newRow: (TileData | null)[] = Array(GRID_SIZE).fill(null);
-  filtered.forEach((tile, i) => {
-    tile.col = i;
-    newRow[i] = tile;
+  newFiltered.forEach((tile, index) => {
+    tile.col = index;
+    newRow[index] = tile;
   });
 
   return { newRow, scoreIncrease, mergedTiles };
@@ -203,6 +213,7 @@ export const isGameOver = (tiles: TileData[]): boolean => {
         for (let c = 0; c < GRID_SIZE; c++) {
             const val = grid[r][c];
             if (val === null) return false;
+            // Check for possible merges
             if (r + 1 < GRID_SIZE && grid[r + 1][c] === val) return false;
             if (c + 1 < GRID_SIZE && grid[r][c + 1] === val) return false;
         }
