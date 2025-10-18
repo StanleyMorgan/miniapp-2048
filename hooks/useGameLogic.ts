@@ -12,12 +12,11 @@ const GAME_STATE_KEY = 'gameState2048';
 const ANIMATION_DURATION = 200;
 
 export const useGameLogic = (isSdkReady: boolean) => {
+  const [isInitializing, setIsInitializing] = useState(true);
+  const [userAddress, setUserAddress] = useState<string | null>(null);
   const [tiles, setTiles] = useState<TileData[]>([]);
   const [score, setScore] = useState(0);
-  const [bestScore, setBestScore] = useState(() => {
-    const savedBestScore = localStorage.getItem(BEST_SCORE_KEY);
-    return savedBestScore ? parseInt(savedBestScore, 10) : 0;
-  });
+  const [bestScore, setBestScore] = useState(0); // Initialized lazily later
   const [serverBestScore, setServerBestScore] = useState<number | null>(null);
   const [userRank, setUserRank] = useState<number | null>(null);
   const [isGameOver, setIsGameOver] = useState(false);
@@ -27,6 +26,8 @@ export const useGameLogic = (isSdkReady: boolean) => {
   const [hasSubmittedScore, setHasSubmittedScore] = useState(false);
 
   const newGame = useCallback(() => {
+    // This function can now rely on `userAddress` being available in the hook's scope.
+    // For example: const seed = createSeed(userAddress, Date.now());
     const { initialTiles } = generateInitialTiles();
     setTiles(initialTiles);
     setScore(0);
@@ -36,36 +37,93 @@ export const useGameLogic = (isSdkReady: boolean) => {
     setHasSubmittedScore(false);
     setIsSubmitting(false);
     setUserRank(null);
-  }, []);
+  }, [userAddress]); // Dependency on userAddress for potential seed generation logic.
 
-  // Load game from localStorage on initial mount, or start a new game.
   useEffect(() => {
-    const savedStateJSON = localStorage.getItem(GAME_STATE_KEY);
-    if (savedStateJSON) {
+    if (!isSdkReady) return;
+
+    const initializeGame = async () => {
+      setIsInitializing(true);
+      
+      // Step 1: Fetch user info (including address)
       try {
-        const savedState = JSON.parse(savedStateJSON);
-        // Basic validation to make sure we're not loading corrupted data
-        if (savedState.tiles && Array.isArray(savedState.tiles) && typeof savedState.score === 'number') {
-          setTiles(savedState.tiles);
-          setScore(savedState.score);
-          setIsGameOver(savedState.isGameOver || false);
-          setIsWon(savedState.isWon || false);
-          return; // Successfully loaded, so we exit and DON'T call newGame()
+        const res = await sdk.quickAuth.fetch('/api/user-info');
+        if (res.ok) {
+          const data = await res.json();
+          setUserAddress(data.primaryAddress || null);
+          console.log('User Address Initialized:', data.primaryAddress);
+        } else {
+          console.warn('Could not fetch user info.');
         }
-      } catch (e) {
-        console.error("Failed to parse saved game state, starting a new game.", e);
-        localStorage.removeItem(GAME_STATE_KEY); // Clear corrupted data
+      } catch (error) {
+        console.error('Error fetching user info:', error);
       }
-    }
-    
-    // If we reach here, it means no valid saved game was found.
-    newGame();
-  }, [newGame]);
+
+      // Step 2: Initialize scores (local and server)
+      const localBest = parseInt(localStorage.getItem(BEST_SCORE_KEY) || '0', 10);
+      let finalBestScore = localBest;
+
+      try {
+        const authResult = await sdk.quickAuth.getToken();
+        if ('token' in authResult) {
+          const response = await fetch('/api/leaderboard', {
+            headers: { 'Authorization': `Bearer ${authResult.token}` },
+          });
+          if (response.ok) {
+            const leaderboardData: { isCurrentUser?: boolean; score: number }[] = await response.json();
+            const currentUserEntry = leaderboardData.find(entry => entry.isCurrentUser);
+            if (currentUserEntry) {
+              const serverScore = currentUserEntry.score || 0;
+              setServerBestScore(serverScore);
+              finalBestScore = Math.max(localBest, serverScore);
+            } else {
+              setServerBestScore(0); // Authenticated but no score yet.
+            }
+          }
+        }
+      } catch (error) {
+        console.error('Error fetching server best score:', error);
+        setServerBestScore(null); // Fallback to local
+      }
+
+      setBestScore(finalBestScore);
+      if (finalBestScore > localBest) {
+        localStorage.setItem(BEST_SCORE_KEY, finalBestScore.toString());
+      }
+      
+      // Step 3: Load saved game state or start a new game
+      const savedStateJSON = localStorage.getItem(GAME_STATE_KEY);
+      let loadedFromSave = false;
+      if (savedStateJSON) {
+        try {
+          const savedState = JSON.parse(savedStateJSON);
+          if (savedState.tiles && Array.isArray(savedState.tiles) && typeof savedState.score === 'number') {
+            setTiles(savedState.tiles);
+            setScore(savedState.score);
+            setIsGameOver(savedState.isGameOver || false);
+            setIsWon(savedState.isWon || false);
+            loadedFromSave = true;
+          }
+        } catch (e) {
+          console.error("Failed to parse saved game state.", e);
+          localStorage.removeItem(GAME_STATE_KEY);
+        }
+      }
+
+      if (!loadedFromSave) {
+        newGame();
+      }
+
+      setIsInitializing(false);
+    };
+
+    initializeGame();
+  }, [isSdkReady, newGame]);
   
   // Save game state to localStorage whenever it changes.
   useEffect(() => {
-    // Do not save the initial empty state. Wait for tiles to be populated.
-    if (tiles.length > 0) {
+    // Do not save during initialization or if tiles are not populated.
+    if (!isInitializing && tiles.length > 0) {
       const gameState = {
         tiles,
         score,
@@ -74,7 +132,7 @@ export const useGameLogic = (isSdkReady: boolean) => {
       };
       localStorage.setItem(GAME_STATE_KEY, JSON.stringify(gameState));
     }
-  }, [tiles, score, isGameOver, isWon]);
+  }, [tiles, score, isGameOver, isWon, isInitializing]);
 
   useEffect(() => {
     if (score > bestScore) {
@@ -83,55 +141,6 @@ export const useGameLogic = (isSdkReady: boolean) => {
     }
   }, [score, bestScore]);
 
-  useEffect(() => {
-    if (!isSdkReady) {
-      setServerBestScore(null);
-      return;
-    }
-
-    const fetchUserBestScore = async () => {
-      try {
-        const authResult = await sdk.quickAuth.getToken();
-        if (!('token' in authResult)) {
-          console.warn("Could not get auth token, user may not be logged in.");
-          setServerBestScore(null);
-          return;
-        }
-
-        const response = await fetch('/api/leaderboard', {
-          headers: { 'Authorization': `Bearer ${authResult.token}` },
-        });
-
-        if (response.ok) {
-          const leaderboardData: { isCurrentUser?: boolean; score: number }[] = await response.json();
-          const currentUserEntry = leaderboardData.find(entry => entry.isCurrentUser);
-
-          if (currentUserEntry) {
-            const serverScore = currentUserEntry.score || 0;
-            setServerBestScore(serverScore);
-            setBestScore(prevBest => {
-              const newBest = Math.max(prevBest, serverScore);
-              if (newBest > prevBest) {
-                localStorage.setItem(BEST_SCORE_KEY, newBest.toString());
-              }
-              return newBest;
-            });
-          } else {
-             // User is authenticated but not on the leaderboard
-            setServerBestScore(0);
-          }
-        } else {
-          console.error('Failed to fetch user best score, falling back to local.', await response.text());
-          setServerBestScore(null);
-        }
-      } catch (error) {
-        console.error('Error fetching user best score, falling back to local.', error);
-        setServerBestScore(null);
-      }
-    };
-    
-    fetchUserBestScore();
-  }, [isSdkReady]);
 
   const submitScore = useCallback(async () => {
     if (hasSubmittedScore || isSubmitting) return;
@@ -260,7 +269,7 @@ export const useGameLogic = (isSdkReady: boolean) => {
     return emptyCells;
   };
 
-  return { tiles, score, bestScore, serverBestScore, isGameOver, isWon, newGame, handleKeyDown, performMove, submitScore, isSubmitting, hasSubmittedScore, userRank };
+  return { tiles, score, bestScore, serverBestScore, isGameOver, isWon, newGame, handleKeyDown, performMove, submitScore, isSubmitting, hasSubmittedScore, userRank, isInitializing, userAddress };
 };
 
 const GRID_SIZE = 4;

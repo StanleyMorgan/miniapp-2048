@@ -27,7 +27,9 @@ const App: React.FC = () => {
     submitScore,
     isSubmitting,
     hasSubmittedScore,
-    userRank
+    userRank,
+    isInitializing,
+    userAddress
   } = useGameLogic(isSdkReady);
 
   const handleGlobalKeyDown = useCallback((event: KeyboardEvent) => {
@@ -102,40 +104,49 @@ const App: React.FC = () => {
   const displayBestScore = serverBestScore !== null ? serverBestScore : bestScore;
 
 
+  const renderGameContent = () => {
+    if (isInitializing) {
+      return (
+        <div className="flex-grow flex flex-col items-center justify-center">
+          <div className="animate-pulse text-slate-400">Initializing session...</div>
+        </div>
+      );
+    }
+    return (
+      <div 
+        className="w-full flex flex-col items-center animate-fade-in"
+        style={{ touchAction: 'none' }} // Prevents browser from scrolling on touch devices
+        onTouchStart={handleTouchStart}
+        onTouchEnd={handleTouchEnd}
+      >
+        <GameControls score={score} bestScore={displayBestScore} onNewGame={newGame} />
+        
+        <div className="relative w-full">
+          <GameBoard tiles={tiles} />
+          {isGameOver && (
+            <GameOver 
+              onRestart={newGame} 
+              score={score} 
+              onSubmitScore={submitScore}
+              isSubmitting={isSubmitting}
+              hasSubmittedScore={hasSubmittedScore}
+              isNewBestScore={shouldShowSaveFlow}
+              userRank={userRank}
+            />
+          )}
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen w-screen text-white flex flex-col items-center p-4 font-sans">
       <div className="w-full sm:max-w-md mx-auto flex flex-col flex-grow">
         <Tabs activeTab={activeTab} onTabChange={setActiveTab} />
         <SeasonSelector activeSeason={activeSeason} onSeasonChange={setActiveSeason} />
         
-        <main className={`flex-grow flex flex-col w-full ${activeTab === 'game' ? 'items-center justify-center' : ''}`}>
-          {activeTab === 'game' ? (
-            <div 
-              className="w-full flex flex-col items-center animate-fade-in"
-              style={{ touchAction: 'none' }} // Prevents browser from scrolling on touch devices
-              onTouchStart={handleTouchStart}
-              onTouchEnd={handleTouchEnd}
-            >
-              <GameControls score={score} bestScore={displayBestScore} onNewGame={newGame} />
-              
-              <div className="relative w-full">
-                <GameBoard tiles={tiles} />
-                {isGameOver && (
-                  <GameOver 
-                    onRestart={newGame} 
-                    score={score} 
-                    onSubmitScore={submitScore}
-                    isSubmitting={isSubmitting}
-                    hasSubmittedScore={hasSubmittedScore}
-                    isNewBestScore={shouldShowSaveFlow}
-                    userRank={userRank}
-                  />
-                )}
-              </div>
-            </div>
-          ) : (
-            <Leaderboard isReady={isSdkReady} />
-          )}
+        <main className="flex-grow flex flex-col w-full items-center justify-center">
+          {activeTab === 'game' ? renderGameContent() : <Leaderboard isReady={isSdkReady} />}
         </main>
       </div>
     </div>
