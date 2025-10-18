@@ -51,6 +51,13 @@ export const useGameLogic = (isSdkReady: boolean) => {
       const hashBuffer = await crypto.subtle.digest('SHA-256', data);
       const hashArray = Array.from(new Uint8Array(hashBuffer));
       const newSeed = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+      
+      console.log("--- NEW GAME INITIALIZED ---");
+      console.log("Drand Randomness:", randomness);
+      console.log("Player Address:", userAddress);
+      console.log("Start Time:", newStartTime);
+      console.log("Generated Seed:", newSeed);
+      console.log("--------------------------");
 
       // 3. Initialize PRNG with the new seed
       const newPrng = new SeededRandom(newSeed);
@@ -239,7 +246,15 @@ export const useGameLogic = (isSdkReady: boolean) => {
         setTiles([...newTiles, ...mergedTiles]);
 
         const directionMap = { 'up': 0, 'right': 1, 'down': 2, 'left': 3 };
-        setMoves(prevMoves => [...prevMoves, directionMap[direction]]);
+        const newMove = directionMap[direction];
+        setMoves(prevMoves => {
+          const updatedMoves = [...prevMoves, newMove];
+          console.log("--- MOVE PERFORMED ---");
+          console.log("Move:", direction, `(${newMove})`);
+          console.log("Updated Moves Sequence:", updatedMoves);
+          console.log("----------------------");
+          return updatedMoves;
+        });
 
         setTimeout(() => {
           const tilesAfterAnimation = newTiles.map(t => ({ ...t, isMerged: false }));
