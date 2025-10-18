@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { sdk } from '@farcaster/miniapp-sdk';
 import type { TileData } from '../types';
 import {
@@ -33,25 +33,7 @@ export const useGameLogic = (isSdkReady: boolean) => {
   const [moves, setMoves] = useState<number[]>([]); // 0:up, 1:right, 2:down, 3:left
   const [prng, setPrng] = useState<SeededRandom | null>(null);
 
-  // Ref to hold the timeout ID for move animations. This is crucial for preventing race conditions.
-  const moveTimeoutRef = useRef<number | null>(null);
-
-  // Cleanup timeout on component unmount to prevent memory leaks.
-  useEffect(() => {
-    return () => {
-      if (moveTimeoutRef.current) {
-        clearTimeout(moveTimeoutRef.current);
-      }
-    };
-  }, []);
-
   const newGame = useCallback(async () => {
-    // Immediately clear any pending move animation timeout to prevent state corruption from race conditions.
-    if (moveTimeoutRef.current) {
-      clearTimeout(moveTimeoutRef.current);
-      moveTimeoutRef.current = null;
-    }
-    
     setIsMoving(true); // Use isMoving as a loading state for new game creation
     
     try {
@@ -260,6 +242,7 @@ export const useGameLogic = (isSdkReady: boolean) => {
     
     if (hasMoved) {
         setIsMoving(true);
+        setScore(prev => prev + scoreIncrease);
         setTiles([...newTiles, ...mergedTiles]);
 
         const directionMap = { 'up': 0, 'right': 1, 'down': 2, 'left': 3 };
@@ -272,18 +255,12 @@ export const useGameLogic = (isSdkReady: boolean) => {
           console.log("----------------------");
           return updatedMoves;
         });
-        
-        // Clear any previous timeout before setting a new one to ensure no overlaps.
-        if (moveTimeoutRef.current) {
-          clearTimeout(moveTimeoutRef.current);
-        }
 
-        moveTimeoutRef.current = window.setTimeout(() => {
+        setTimeout(() => {
           const tilesAfterAnimation = newTiles.map(t => ({ ...t, isMerged: false }));
           const finalTiles = addRandomTile(tilesAfterAnimation, prng);
           setTiles(finalTiles);
           setIsMoving(false);
-          moveTimeoutRef.current = null; // Clear the ref after the timeout has executed.
 
           if (!isWon && finalTiles.some(tile => tile.value === 2048)) {
               setIsWon(true);
