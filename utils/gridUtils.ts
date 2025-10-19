@@ -30,7 +30,11 @@ export class SeededRandom {
    */
   public next(): number {
     this.seed = (this.a * this.seed + this.c) % this.m;
-    return this.seed / this.m;
+    const result = this.seed / this.m;
+    // CRITICAL FIX: The LCG calculation with a negative seed can produce a negative result
+    // in JavaScript due to the behavior of the % operator. This ensures the output is
+    // always in the correct [0, 1) range, preserving determinism while fixing the bug.
+    return result < 0 ? result + 1 : result;
   }
 }
 
@@ -79,6 +83,11 @@ const getEmptyCells = (grid: Grid): { row: number; col: number }[] => {
  * @returns An object containing the new array of tiles and the next available tile ID.
  */
 export const addRandomTile = (tiles: TileData[], prng: SeededRandom, tileIdCounter: number): { newTiles: TileData[], newCounter: number } => {
+  if (!prng || typeof prng.next !== 'function') {
+    console.error('[addRandomTile] CRITICAL: Received invalid `prng` object!', prng);
+    throw new Error("Invalid PRNG provided to addRandomTile");
+  }
+
   const grid = tilesToGrid(tiles);
   const emptyCells = getEmptyCells(grid);
   if (emptyCells.length === 0) {
@@ -86,7 +95,19 @@ export const addRandomTile = (tiles: TileData[], prng: SeededRandom, tileIdCount
   }
 
   const cellIndex = Math.floor(prng.next() * emptyCells.length);
-  const { row, col } = emptyCells[cellIndex];
+  const cell = emptyCells[cellIndex];
+  
+  // This check is left as a final safeguard, but the root cause in SeededRandom.next() is fixed.
+  if (!cell) {
+    console.error('[addRandomTile] CRITICAL: `cell` is undefined. This should not happen after PRNG fix.', {
+      cellIndex,
+      emptyCellsLength: emptyCells.length,
+    });
+    // Throw an error to halt execution, as continuing would violate game verifiability.
+    throw new Error("Game state corruption detected in addRandomTile.");
+  }
+
+  const { row, col } = cell;
   
   // The value is 2 with 90% probability, and 4 with 10% probability.
   const value = prng.next() < 0.9 ? 2 : 4;
