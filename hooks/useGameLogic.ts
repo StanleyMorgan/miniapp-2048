@@ -305,8 +305,8 @@ export const useGameLogic = (isSdkReady: boolean, activeSeason: Season) => {
             BigInt(score), // uint64
             BigInt(startTime), // uint64
             BigInt(endTime), // uint64
-            '0x' + seed, // bytes32
-            randomness as `0x${string}`, // bytes32
+            ('0x' + seed) as `0x${string}`, // bytes32
+            ('0x' + randomness) as `0x${string}`, // bytes32
             finalMovesHash as `0x${string}` // bytes32
         ];
 
