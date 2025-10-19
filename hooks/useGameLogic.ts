@@ -36,6 +36,7 @@ const ANIMATION_DURATION = 200;
 const INITIAL_MOVES_HASH = '0x' + '0'.repeat(64);
 
 export const useGameLogic = (isSdkReady: boolean, activeSeason: Season) => {
+  console.log('useGameLogic hook initialized.');
   const [isInitializing, setIsInitializing] = useState(true);
   const [userAddress, setUserAddress] = useState<string | null>(null);
   const [tiles, setTiles] = useState<TileData[]>([]);
@@ -89,7 +90,11 @@ export const useGameLogic = (isSdkReady: boolean, activeSeason: Season) => {
 
 
   const newGame = useCallback(async () => {
-    if (newGameLoadingRef.current) return;
+    console.log('newGame: starting.');
+    if (newGameLoadingRef.current) {
+        console.log('newGame: already loading, returning.');
+        return;
+    }
     gameIdRef.current++;
     if (moveTimeoutRef.current) clearTimeout(moveTimeoutRef.current);
 
@@ -111,9 +116,11 @@ export const useGameLogic = (isSdkReady: boolean, activeSeason: Season) => {
     setIsMoving(true);
     
     try {
+      console.log('newGame: fetching /api/start-game');
       const response = await fetch('/api/start-game');
       if (!response.ok) throw new Error(`Failed to start a new game session. Status: ${response.status}`);
       const { randomness: newRandomness, startTime: newStartTime } = await response.json();
+      console.log('newGame: received randomness and startTime.');
 
       const dataToHash = `${newRandomness}${userAddress ?? ''}${newStartTime}`;
       const encoder = new TextEncoder();
@@ -121,6 +128,7 @@ export const useGameLogic = (isSdkReady: boolean, activeSeason: Season) => {
       const hashBuffer = await crypto.subtle.digest('SHA-256', data);
       const hashArray = Array.from(new Uint8Array(hashBuffer));
       const newSeed = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+      console.log('newGame: generating seed and initial tiles.');
 
       const newPrng = new SeededRandom(newSeed);
       const { initialTiles, newCounter } = generateInitialTiles(newPrng);
@@ -136,31 +144,43 @@ export const useGameLogic = (isSdkReady: boolean, activeSeason: Season) => {
       setStartTime(newStartTime);
       setPrng(newPrng);
       setTiles(initialTiles);
+      console.log('newGame: finished successfully.');
 
     } catch (error) {
       console.error(`Error starting new game:`, error);
     } finally {
       setIsMoving(false);
       newGameLoadingRef.current = false;
+      console.log('newGame: finally block executed.');
     }
   }, [userAddress]);
 
   useEffect(() => {
-    if (!isSdkReady) return;
+    if (!isSdkReady) {
+        console.log('useGameLogic useEffect: waiting for SDK to be ready.');
+        return;
+    }
     const initializeGame = async () => {
+      console.log('initializeGame: starting.');
       setIsInitializing(true);
       try {
+        console.log('initializeGame: fetching user info...');
         const res = await sdk.quickAuth.fetch('/api/user-info');
         if (res.ok) {
           const data = await res.json();
           setUserAddress(data.primaryAddress || null);
+          console.log('initializeGame: user info fetched.', data);
+        } else {
+            console.warn('initializeGame: failed to fetch user info.', res.status);
         }
       } catch (error) { console.error('Error fetching user info:', error); }
 
       const localBest = parseInt(localStorage.getItem(BEST_SCORE_KEY) || '0', 10);
       let finalBestScore = localBest;
+      console.log(`initializeGame: local best score is ${localBest}`);
 
       try {
+          console.log('initializeGame: fetching server best score...');
           const authResult = await sdk.quickAuth.getToken();
           if ('token' in authResult) {
             const response = await fetch('/api/leaderboard', { headers: { 'Authorization': `Bearer ${authResult.token}` } });
@@ -170,8 +190,14 @@ export const useGameLogic = (isSdkReady: boolean, activeSeason: Season) => {
               if (currentUserEntry) {
                 setServerBestScore(currentUserEntry.score || 0);
                 finalBestScore = Math.max(localBest, currentUserEntry.score || 0);
-              } else { setServerBestScore(0); }
+                console.log(`initializeGame: server best score is ${currentUserEntry.score}. Final best: ${finalBestScore}`);
+              } else { 
+                setServerBestScore(0); 
+                console.log('initializeGame: user not on leaderboard. Server best score is 0.');
+              }
             }
+          } else {
+            console.warn('initializeGame: could not get auth token.');
           }
       } catch (error) {
         console.error('Error fetching server best score:', error);
@@ -182,6 +208,7 @@ export const useGameLogic = (isSdkReady: boolean, activeSeason: Season) => {
       
       const savedStateJSON = localStorage.getItem(GAME_STATE_KEY);
       let loadedFromSave = false;
+      console.log(`initializeGame: checking for saved game state. Found: ${!!savedStateJSON}`);
       if (savedStateJSON) {
         try {
           const savedState = JSON.parse(savedStateJSON);
@@ -203,6 +230,7 @@ export const useGameLogic = (isSdkReady: boolean, activeSeason: Season) => {
 
             const maxId = savedState.tiles.reduce((max: number, t: TileData) => Math.max(max, t.id), 0);
             tileIdCounterRef.current = maxId + 1;
+            console.log('initializeGame: loaded game from saved state.');
             loadedFromSave = true;
           } else {
             console.warn("Saved game state is invalid. Starting a new game.");
@@ -213,8 +241,12 @@ export const useGameLogic = (isSdkReady: boolean, activeSeason: Season) => {
           localStorage.removeItem(GAME_STATE_KEY);
         }
       }
-      if (!loadedFromSave) await newGame();
+      if (!loadedFromSave) {
+        console.log('initializeGame: no saved state, starting new game.');
+        await newGame();
+      }
       setIsInitializing(false);
+      console.log('initializeGame: finished.');
     };
     initializeGame();
   }, [isSdkReady, newGame]);
