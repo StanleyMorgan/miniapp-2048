@@ -244,6 +244,16 @@ export const useGameLogic = (isSdkReady: boolean, activeSeason: Season) => {
     if (activeSeason === 'monad-s0') {
       try {
         console.log("Verifying MONAD S0 submission...");
+        
+        // Log values for debugging before the check
+        console.log("--- MONAD S0 Submission - Debug Values ---");
+        console.log(`seed: ${seed}`);
+        console.log(`moves: ${JSON.stringify(moves)}`);
+        console.log(`randomness: ${randomness}`);
+        console.log(`userAddress: ${userAddress}`);
+        console.log(`startTime: ${startTime}`);
+        console.log("------------------------------------------");
+
         if (!seed || !moves || !randomness || !userAddress || !startTime) {
           throw new Error("Missing data for on-chain submission. Seed, moves, randomness, user address, or startTime is null.");
         }
