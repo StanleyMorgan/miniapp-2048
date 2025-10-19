@@ -35,9 +35,16 @@ export const useGameLogic = (isSdkReady: boolean) => {
   const [prng, setPrng] = useState<SeededRandom | null>(null);
 
   const newGame = useCallback(async () => {
+    // Immediately cancel any pending move animation timeout from the previous game.
     if (moveTimeoutRef.current) {
       clearTimeout(moveTimeoutRef.current);
+      moveTimeoutRef.current = null;
     }
+    // Synchronously clear the board to prevent tiles from the previous game
+    // from persisting while new game data is fetched. This prevents race
+    // conditions that can lead to corrupted state and errors.
+    setTiles([]);
+    
     setIsMoving(true); // Use isMoving as a loading state for new game creation
     
     try {
