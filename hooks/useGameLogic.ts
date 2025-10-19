@@ -7,15 +7,16 @@ import {
   isGameOver as checkIsGameOver,
   addRandomTile,
   SeededRandom,
-  verifyGame,
-  packMoves,
   packBoard,
+  sha256,
+  hexToUint8Array,
 } from '../utils/gridUtils';
 import { Season } from '../components/SeasonSelector';
 
 const BEST_SCORE_KEY = 'bestScore2048';
 const GAME_STATE_KEY = 'gameState2048';
 const ANIMATION_DURATION = 200;
+const INITIAL_MOVES_HASH = '0x' + '0'.repeat(64);
 
 export const useGameLogic = (isSdkReady: boolean, activeSeason: Season) => {
   const [isInitializing, setIsInitializing] = useState(true);
@@ -40,7 +41,8 @@ export const useGameLogic = (isSdkReady: boolean, activeSeason: Season) => {
   const [randomness, setRandomness] = useState<string | null>(null);
   const [seed, setSeed] = useState<string | null>(null);
   const [startTime, setStartTime] = useState<number | null>(null);
-  const [moves, setMoves] = useState<number[]>([]); // 0:up, 1:right, 2:down, 3:left
+  const [moves, setMoves] = useState<number[]>([]); // Keep for local replay/debug, but don't submit
+  const [finalMovesHash, setFinalMovesHash] = useState<string>(INITIAL_MOVES_HASH);
   const [prng, setPrng] = useState<SeededRandom | null>(null);
 
   const newGame = useCallback(async () => {
@@ -70,6 +72,7 @@ export const useGameLogic = (isSdkReady: boolean, activeSeason: Season) => {
     setSeed(null);
     setPrng(null);
     setRandomness(null);
+    setFinalMovesHash(INITIAL_MOVES_HASH);
     
     // Set loading locks.
     newGameLoadingRef.current = true;
@@ -110,6 +113,7 @@ export const useGameLogic = (isSdkReady: boolean, activeSeason: Season) => {
       setStartTime(newStartTime);
       setPrng(newPrng);
       setMoves([]); // Redundant, but safe.
+      setFinalMovesHash(INITIAL_MOVES_HASH); // Redundant, but safe
       setTiles(initialTiles);
 
     } catch (error) {
@@ -170,8 +174,8 @@ export const useGameLogic = (isSdkReady: boolean, activeSeason: Season) => {
       if (savedStateJSON) {
         try {
           const savedState = JSON.parse(savedStateJSON);
-          // A valid, verifiable game state must have both a seed and the randomness value.
-          if (savedState.seed && savedState.randomness) {
+          // A valid, verifiable game state must have randomness and the moves hash.
+          if (savedState.randomness && savedState.finalMovesHash) {
             setTiles(savedState.tiles);
             setScore(savedState.score);
             setIsGameOver(savedState.isGameOver || false);
@@ -180,6 +184,7 @@ export const useGameLogic = (isSdkReady: boolean, activeSeason: Season) => {
             setStartTime(savedState.startTime);
             setMoves(savedState.moves);
             setRandomness(savedState.randomness);
+            setFinalMovesHash(savedState.finalMovesHash);
             
             // Re-create the PRNG and fast-forward it to the correct state
             const loadedPrng = new SeededRandom(savedState.seed);
@@ -197,7 +202,7 @@ export const useGameLogic = (isSdkReady: boolean, activeSeason: Season) => {
 
             loadedFromSave = true;
           } else {
-            // If the state is from an older version (e.g., has a seed but no randomness),
+            // If the state is from an older version (e.g., missing randomness or hash),
             // it's not verifiable. We must start a new game.
             console.warn("Saved game state is from an older version or is invalid. Starting a new game.");
             localStorage.removeItem(GAME_STATE_KEY);
@@ -230,10 +235,11 @@ export const useGameLogic = (isSdkReady: boolean, activeSeason: Season) => {
         startTime,
         moves,
         randomness,
+        finalMovesHash,
       };
       localStorage.setItem(GAME_STATE_KEY, JSON.stringify(gameState));
     }
-  }, [tiles, score, isGameOver, isWon, isInitializing, seed, startTime, moves, randomness]);
+  }, [tiles, score, isGameOver, isWon, isInitializing, seed, startTime, moves, randomness, finalMovesHash]);
 
   useEffect(() => {
     if (score > bestScore) {
@@ -249,46 +255,28 @@ export const useGameLogic = (isSdkReady: boolean, activeSeason: Season) => {
     
     if (activeSeason === 'monad-s0') {
       try {
-        console.log("Verifying MONAD S0 submission...");
+        console.log("Preparing MONAD S0 on-chain data...");
+
+        if (!seed || !randomness || !userAddress || !startTime || !finalMovesHash) {
+          throw new Error("Missing data for on-chain submission. Seed, randomness, user address, startTime, or finalMovesHash is null.");
+        }
         
-        // Log values for debugging before the check
-        console.log("--- MONAD S0 Submission - Debug Values ---");
-        console.log(`seed: ${seed}`);
-        console.log(`moves: ${JSON.stringify(moves)}`);
-        console.log(`randomness: ${randomness}`);
-        console.log(`userAddress: ${userAddress}`);
-        console.log(`startTime: ${startTime}`);
-        console.log("------------------------------------------");
-
-        if (!seed || !moves || !randomness || !userAddress || !startTime) {
-          throw new Error("Missing data for on-chain submission. Seed, moves, randomness, user address, or startTime is null.");
-        }
-
-        const verificationResult = verifyGame(seed, moves);
-        if (verificationResult.finalScore !== score) {
-            console.error("!!! VERIFICATION FAILED !!!");
-            console.error(`Client Score: ${score}, Verified Score: ${verificationResult.finalScore}`);
-            // In a real app, you would show an error to the user here.
-        } else {
-            console.log("Game verification successful!");
-        }
-
-        const packedMoves = packMoves(moves);
-        const packedBoard = packBoard(tiles); // Use current tiles state for final board
+        const packedBoard = packBoard(tiles);
         const endTime = Date.now();
 
         console.log("--- MONAD S0 On-Chain Submission Data ---");
-        console.log(`Player Address: ${userAddress}`);
-        console.log(`Randomness (from Drand): ${randomness}`);
-        console.log(`Game Seed (SHA-256): ${seed}`);
-        console.log(`Packed Moves (hex): ${packedMoves}`);
-        console.log(`Packed Final Board (hex): ${packedBoard}`);
-        console.log(`Final Score: ${score}`);
-        console.log(`Start Time (ms): ${startTime}`);
-        console.log(`End Time (ms): ${endTime}`);
+        console.log(`Player Address (address): ${userAddress}`);
+        console.log(`Randomness (bytes32): ${randomness}`);
+        console.log(`Game Seed (bytes32): 0x${seed}`);
+        console.log(`Final Moves Hash (bytes32): ${finalMovesHash}`);
+        console.log(`Packed Final Board (uint128): ${packedBoard}`);
+        console.log(`Final Score (uint64): ${score}`);
+        console.log(`Start Time (uint64): ${startTime}`);
+        console.log(`End Time (uint64): ${endTime}`);
         console.log("-----------------------------------------");
         
-        setHasSubmittedScore(true); // Mark as "submitted" to update UI
+        // This is a simulation. In a real scenario, you would send this data to a smart contract.
+        setHasSubmittedScore(true);
       } catch (error) {
         console.error("Error during Monad S0 submission process:", error);
       } finally {
@@ -331,10 +319,10 @@ export const useGameLogic = (isSdkReady: boolean, activeSeason: Season) => {
     } finally {
       setIsSubmitting(false);
     }
-  }, [score, hasSubmittedScore, isSubmitting, seed, startTime, moves, activeSeason, randomness, userAddress, tiles]);
+  }, [score, hasSubmittedScore, isSubmitting, seed, startTime, moves, activeSeason, randomness, userAddress, tiles, finalMovesHash]);
 
-  const performMove = useCallback((direction: 'up' | 'down' | 'left' | 'right') => {
-    if (isGameOver || isMoving || !prng) return;
+  const performMove = useCallback(async (direction: 'up' | 'down' | 'left' | 'right') => {
+    if (isGameOver || isMoving || !prng || !finalMovesHash) return;
 
     // Capture the game ID at the start of the move to handle race conditions.
     const gameIdAtMoveStart = gameIdRef.current;
@@ -348,6 +336,21 @@ export const useGameLogic = (isSdkReady: boolean, activeSeason: Season) => {
         const directionMap = { 'up': 0, 'right': 1, 'down': 2, 'left': 3 };
         const newMove = directionMap[direction];
         setMoves(prevMoves => [...prevMoves, newMove]);
+
+        // Update the rolling hash
+        try {
+          const prevHashBytes = hexToUint8Array(finalMovesHash);
+          const moveByte = new Uint8Array([newMove]);
+          const dataToHash = new Uint8Array(prevHashBytes.length + moveByte.length);
+          dataToHash.set(prevHashBytes);
+          dataToHash.set(moveByte, prevHashBytes.length);
+          
+          const newHash = await sha256(dataToHash);
+          setFinalMovesHash(newHash);
+        } catch (error) {
+          console.error("Failed to update moves hash:", error);
+          // In a real app, you might want to show an error or invalidate the game state.
+        }
 
         moveTimeoutRef.current = window.setTimeout(() => {
           // Before updating state, check if a new game has started in the meantime.
@@ -377,7 +380,7 @@ export const useGameLogic = (isSdkReady: boolean, activeSeason: Season) => {
           }
         }, ANIMATION_DURATION);
     }
-  }, [tiles, isGameOver, isMoving, isWon, prng]);
+  }, [tiles, isGameOver, isMoving, isWon, prng, finalMovesHash]);
 
   const handleKeyDown = useCallback((e: KeyboardEvent) => {
     let direction: 'up' | 'down' | 'left' | 'right' | null = null;
