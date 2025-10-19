@@ -134,7 +134,7 @@ export const useGameLogic = (isSdkReady: boolean, activeSeason: Season) => {
       const dataToHash = `${newRandomness}${userAddressRef.current ?? ''}${newStartTime}`;
       const encoder = new TextEncoder();
       const data = encoder.encode(dataToHash);
-      const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+      const hashBuffer = await crypto.subtle.digest('SHA-265', data);
       const hashArray = Array.from(new Uint8Array(hashBuffer));
       const newSeed = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
       console.log('newGame: generating seed and initial tiles.');
@@ -164,102 +164,104 @@ export const useGameLogic = (isSdkReady: boolean, activeSeason: Season) => {
     }
   }, []);
 
+  // This single useEffect now controls all initialization and re-initialization logic.
+  // It runs when the SDK is ready, and critically, whenever the activeSeason changes.
   useEffect(() => {
     if (!isSdkReady) {
-        console.log('useGameLogic useEffect: waiting for SDK to be ready.');
+        console.log('Initialization waiting for SDK to be ready.');
         return;
     }
-    const initializeGame = async () => {
-      console.log('initializeGame: starting.');
-      setIsInitializing(true);
-      try {
-        console.log('initializeGame: fetching user info...');
-        const res = await sdk.quickAuth.fetch('/api/user-info');
-        if (res.ok) {
-          const data = await res.json();
-          setUserAddress(data.primaryAddress || null);
-          console.log('initializeGame: user info fetched.', data);
-        } else {
-            console.warn('initializeGame: failed to fetch user info.', res.status);
-        }
-      } catch (error) { console.error('Error fetching user info:', error); }
 
-      const localBest = parseInt(localStorage.getItem(BEST_SCORE_KEY) || '0', 10);
-      let finalBestScore = localBest;
-      console.log(`initializeGame: local best score is ${localBest}`);
+    const initializeGameForSeason = async () => {
+        console.log(`Initializing game for season: ${activeSeason}`);
+        // Step 1: Immediately set the initializing flag. This ensures the UI shows a loading
+        // state instead of stale data from a previous season during the async operations below.
+        setIsInitializing(true);
 
-      try {
-          console.log('initializeGame: fetching server best score...');
-          const authResult = await sdk.quickAuth.getToken();
-          if ('token' in authResult) {
-            const response = await fetch('/api/leaderboard', { headers: { 'Authorization': `Bearer ${authResult.token}` } });
-            if (response.ok) {
-              const leaderboardData: { isCurrentUser?: boolean; score: number }[] = await response.json();
-              const currentUserEntry = leaderboardData.find(entry => entry.isCurrentUser);
-              if (currentUserEntry) {
-                setFarcasterBestScore(currentUserEntry.score || 0);
-                finalBestScore = Math.max(localBest, currentUserEntry.score || 0);
-                console.log(`initializeGame: server best score is ${currentUserEntry.score}. Final best: ${finalBestScore}`);
-              } else { 
-                setFarcasterBestScore(0); 
-                console.log('initializeGame: user not on leaderboard. Server best score is 0.');
-              }
-            }
-          } else {
-            console.warn('initializeGame: could not get auth token.');
-          }
-      } catch (error) {
-        console.error('Error fetching server best score:', error);
-        setFarcasterBestScore(null);
-      }
-      setBestScore(finalBestScore);
-      if (finalBestScore > localBest) localStorage.setItem(BEST_SCORE_KEY, finalBestScore.toString());
-      
-      const GAME_STATE_KEY = `gameState2048_${activeSeason}`;
-      const savedStateJSON = localStorage.getItem(GAME_STATE_KEY);
-      let loadedFromSave = false;
-      console.log(`initializeGame: checking for saved game state for season ${activeSeason}. Found: ${!!savedStateJSON}`);
-      if (savedStateJSON) {
+        // Step 2: Fetch user data and leaderboard scores. This is not part of the core
+        // game state but is needed for the UI (e.g., "Best" score).
         try {
-          const savedState = JSON.parse(savedStateJSON);
-          if (savedState.randomness && savedState.finalMovesHash) {
-            setTiles(savedState.tiles);
-            setScore(savedState.score);
-            setIsGameOver(savedState.isGameOver || false);
-            setIsWon(savedState.isWon || false);
-            setSeed(savedState.seed);
-            setStartTime(savedState.startTime);
-            setMoves(savedState.moves);
-            setRandomness(savedState.randomness);
-            setFinalMovesHash(savedState.finalMovesHash);
-            
-            const loadedPrng = new SeededRandom(savedState.seed);
-            const prngCalls = 4 + (savedState.moves.length * 2);
-            for (let i = 0; i < prngCalls; i++) loadedPrng.next();
-            setPrng(loadedPrng);
+            const res = await sdk.quickAuth.fetch('/api/user-info');
+            if (res.ok) {
+                const data = await res.json();
+                setUserAddress(data.primaryAddress || null);
+            }
+        } catch (error) { console.error('Error fetching user info:', error); }
 
-            const maxId = savedState.tiles.reduce((max: number, t: TileData) => Math.max(max, t.id), 0);
-            tileIdCounterRef.current = maxId + 1;
-            console.log('initializeGame: loaded game from saved state.');
-            loadedFromSave = true;
-          } else {
-            console.warn("Saved game state is invalid. Starting a new game.");
-            localStorage.removeItem(GAME_STATE_KEY);
-          }
-        } catch (e) {
-          console.error("Failed to parse saved game state.", e);
-          localStorage.removeItem(GAME_STATE_KEY);
+        const localBest = parseInt(localStorage.getItem(BEST_SCORE_KEY) || '0', 10);
+        let finalBestScore = localBest;
+        try {
+            const authResult = await sdk.quickAuth.getToken();
+            if ('token' in authResult) {
+                const response = await fetch('/api/leaderboard', { headers: { 'Authorization': `Bearer ${authResult.token}` } });
+                if (response.ok) {
+                    const leaderboardData: { isCurrentUser?: boolean; score: number }[] = await response.json();
+                    const currentUserEntry = leaderboardData.find(entry => entry.isCurrentUser);
+                    if (currentUserEntry) {
+                        setFarcasterBestScore(currentUserEntry.score || 0);
+                        finalBestScore = Math.max(localBest, currentUserEntry.score || 0);
+                    } else { 
+                        setFarcasterBestScore(0); 
+                    }
+                }
+            }
+        } catch (error) {
+            console.error('Error fetching server best score:', error);
+            setFarcasterBestScore(null);
         }
-      }
-      if (!loadedFromSave) {
-        console.log('initializeGame: no saved state, starting new game.');
-        await newGame();
-      }
-      setIsInitializing(false);
-      console.log('initializeGame: finished.');
+        setBestScore(finalBestScore);
+        if (finalBestScore > localBest) localStorage.setItem(BEST_SCORE_KEY, finalBestScore.toString());
+
+        // Step 3: Load the specific game state for the currently active season.
+        const GAME_STATE_KEY = `gameState2048_${activeSeason}`;
+        const savedStateJSON = localStorage.getItem(GAME_STATE_KEY);
+        let loadedFromSave = false;
+
+        if (savedStateJSON) {
+            console.log(`Found and loading saved state for season: ${activeSeason}`);
+            try {
+                const savedState = JSON.parse(savedStateJSON);
+                if (savedState.randomness && savedState.finalMovesHash) {
+                    setTiles(savedState.tiles);
+                    setScore(savedState.score);
+                    setIsGameOver(savedState.isGameOver || false);
+                    setIsWon(savedState.isWon || false);
+                    setSeed(savedState.seed);
+                    setStartTime(savedState.startTime);
+                    setMoves(savedState.moves);
+                    setRandomness(savedState.randomness);
+                    setFinalMovesHash(savedState.finalMovesHash);
+                    
+                    const loadedPrng = new SeededRandom(savedState.seed);
+                    const prngCalls = 4 + (savedState.moves.length * 2);
+                    for (let i = 0; i < prngCalls; i++) loadedPrng.next();
+                    setPrng(loadedPrng);
+
+                    const maxId = savedState.tiles.reduce((max: number, t: TileData) => Math.max(max, t.id), 0);
+                    tileIdCounterRef.current = maxId + 1;
+                    loadedFromSave = true;
+                } else {
+                    localStorage.removeItem(GAME_STATE_KEY);
+                }
+            } catch (e) {
+                console.error("Failed to parse saved game state, starting a new game instead.", e);
+                localStorage.removeItem(GAME_STATE_KEY);
+            }
+        }
+
+        // Step 4: If no valid save state was found for this season, start a completely new game.
+        if (!loadedFromSave) {
+            console.log(`No saved state for season: ${activeSeason}. Starting a new game.`);
+            await newGame();
+        }
+
+        // Step 5: All loading and setup is complete.
+        setIsInitializing(false);
+        console.log(`Initialization finished for season: ${activeSeason}`);
     };
-    initializeGame();
-  }, [isSdkReady, newGame, activeSeason]);
+
+    initializeGameForSeason();
+  }, [isSdkReady, activeSeason]);
   
   useEffect(() => {
     if (!isInitializing && tiles.length > 0 && seed) {
