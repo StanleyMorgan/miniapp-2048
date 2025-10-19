@@ -41,6 +41,10 @@ export const useGameLogic = (isSdkReady: boolean, activeSeason: Season) => {
   const moveTimeoutRef = useRef<number | null>(null);
   const gameIdRef = useRef(0);
   const newGameLoadingRef = useRef(false);
+  const userAddressRef = useRef(userAddress);
+  useEffect(() => {
+    userAddressRef.current = userAddress;
+  }, [userAddress]);
 
   const [randomness, setRandomness] = useState<string | null>(null);
   const [seed, setSeed] = useState<string | null>(null);
@@ -127,7 +131,7 @@ export const useGameLogic = (isSdkReady: boolean, activeSeason: Season) => {
       const { randomness: newRandomness, startTime: newStartTime } = await response.json();
       console.log('newGame: received randomness and startTime.');
 
-      const dataToHash = `${newRandomness}${userAddress ?? ''}${newStartTime}`;
+      const dataToHash = `${newRandomness}${userAddressRef.current ?? ''}${newStartTime}`;
       const encoder = new TextEncoder();
       const data = encoder.encode(dataToHash);
       const hashBuffer = await crypto.subtle.digest('SHA-256', data);
@@ -158,7 +162,7 @@ export const useGameLogic = (isSdkReady: boolean, activeSeason: Season) => {
       newGameLoadingRef.current = false;
       console.log('newGame: finally block executed.');
     }
-  }, [userAddress]);
+  }, []);
 
   useEffect(() => {
     if (!isSdkReady) {
