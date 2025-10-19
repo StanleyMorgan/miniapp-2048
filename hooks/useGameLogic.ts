@@ -17,7 +17,6 @@ import { MONAD_LEADERBOARD_ADDRESS, MONAD_LEADERBOARD_ABI } from '../constants/c
 
 
 const BEST_SCORE_KEY = 'bestScore2048';
-const GAME_STATE_KEY = 'gameState2048';
 const ANIMATION_DURATION = 200;
 const INITIAL_MOVES_HASH = '0x' + '0'.repeat(64);
 
@@ -212,9 +211,10 @@ export const useGameLogic = (isSdkReady: boolean, activeSeason: Season) => {
       setBestScore(finalBestScore);
       if (finalBestScore > localBest) localStorage.setItem(BEST_SCORE_KEY, finalBestScore.toString());
       
+      const GAME_STATE_KEY = `gameState2048_${activeSeason}`;
       const savedStateJSON = localStorage.getItem(GAME_STATE_KEY);
       let loadedFromSave = false;
-      console.log(`initializeGame: checking for saved game state. Found: ${!!savedStateJSON}`);
+      console.log(`initializeGame: checking for saved game state for season ${activeSeason}. Found: ${!!savedStateJSON}`);
       if (savedStateJSON) {
         try {
           const savedState = JSON.parse(savedStateJSON);
@@ -255,14 +255,15 @@ export const useGameLogic = (isSdkReady: boolean, activeSeason: Season) => {
       console.log('initializeGame: finished.');
     };
     initializeGame();
-  }, [isSdkReady, newGame]);
+  }, [isSdkReady, newGame, activeSeason]);
   
   useEffect(() => {
     if (!isInitializing && tiles.length > 0 && seed) {
+      const GAME_STATE_KEY = `gameState2048_${activeSeason}`;
       const gameState = { tiles, score, isGameOver, isWon, seed, startTime, moves, randomness, finalMovesHash };
       localStorage.setItem(GAME_STATE_KEY, JSON.stringify(gameState));
     }
-  }, [tiles, score, isGameOver, isWon, isInitializing, seed, startTime, moves, randomness, finalMovesHash]);
+  }, [tiles, score, isGameOver, isWon, isInitializing, seed, startTime, moves, randomness, finalMovesHash, activeSeason]);
 
   useEffect(() => {
     if (score > bestScore) {
