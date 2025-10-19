@@ -43,20 +43,32 @@ export const useGameLogic = (isSdkReady: boolean) => {
       return;
     }
     
-    // Increment the game ID to invalidate any pending operations from the previous game.
+    // Increment game ID to invalidate stale async operations from the previous game.
     gameIdRef.current++;
     
-    // Immediately cancel any pending move animation timeout from the previous game.
+    // Cancel any pending animation timeout from the previous move.
     if (moveTimeoutRef.current) {
       clearTimeout(moveTimeoutRef.current);
       moveTimeoutRef.current = null;
     }
-    // Synchronously clear the board to prevent tiles from the previous game
-    // from persisting while new game data is fetched.
+
+    // Immediately and synchronously reset the entire game state.
+    // This provides a clean slate and prevents "ghost" tiles from persisting
+    // during the async operations below. It also helps invalidate stale closures.
     setTiles([]);
+    setScore(0);
+    setIsGameOver(false);
+    setIsWon(false);
+    setHasSubmittedScore(false);
+    setIsSubmitting(false);
+    setUserRank(null);
+    setMoves([]);
+    setSeed(null);
+    setPrng(null);
     
+    // Set loading locks.
     newGameLoadingRef.current = true;
-    setIsMoving(true); // Use isMoving to block tile movements during game creation
+    setIsMoving(true); // Blocks new moves while game is being created.
     
     try {
       // 1. Fetch randomness and server time for seed generation
@@ -87,18 +99,13 @@ export const useGameLogic = (isSdkReady: boolean) => {
       // 4. Generate initial tiles using the PRNG
       const { initialTiles } = generateInitialTiles(newPrng);
       
-      // 5. Set all new states
+      // 5. Set the final state for the new game.
       setSeed(newSeed);
       setStartTime(newStartTime);
       setPrng(newPrng);
-      setMoves([]);
+      setMoves([]); // Redundant, but safe.
       setTiles(initialTiles);
-      setScore(0);
-      setIsGameOver(false);
-      setIsWon(false);
-      setHasSubmittedScore(false);
-      setIsSubmitting(false);
-      setUserRank(null);
+      // Score, gameOver etc. are already reset from the sync part above.
 
     } catch (error) {
       console.error("Error starting new game:", error);
@@ -196,6 +203,7 @@ export const useGameLogic = (isSdkReady: boolean) => {
   }, [isSdkReady, newGame]);
   
   useEffect(() => {
+    // Do not save state if there's no seed yet (e.g., during the initial reset in newGame)
     if (!isInitializing && tiles.length > 0 && seed) {
       const gameState = {
         tiles,
