@@ -50,7 +50,7 @@ export async function POST(request: Request) {
       const userResponse = await fetch(`https://api.warpcast.com/v2/user-by-fid?fid=${fid}`);
       if (userResponse.ok) {
         const userData = await userResponse.json();
-        if (userData.result && userData.result.user) {
+        if (userData && userData.result && userData.result.user) {
           username = userData.result.user.username;
           console.log(`[submit-score] Fetched username "${username}" for FID ${fid}`);
         }
@@ -67,7 +67,7 @@ export async function POST(request: Request) {
       const addressResponse = await fetch(`https://api.farcaster.xyz/fc/primary-address?fid=${fid}&protocol=ethereum`);
       if (addressResponse.ok) {
         const addressData = await addressResponse.json();
-        if (addressData.result && addressData.result.address) {
+        if (addressData && addressData.result && addressData.result.address) {
           primaryAddress = addressData.result.address.address;
           console.log(`[submit-score] Fetched primary address "${primaryAddress}" for FID ${fid}`);
         }

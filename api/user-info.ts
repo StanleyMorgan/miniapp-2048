@@ -40,7 +40,7 @@ export async function GET(request: Request) {
       const addressResponse = await fetch(`https://api.farcaster.xyz/fc/primary-address?fid=${fid}&protocol=ethereum`);
       if (addressResponse.ok) {
         const addressData = await addressResponse.json();
-        if (addressData.result && addressData.result.address) {
+        if (addressData && addressData.result && addressData.result.address) {
           userInfo.primaryAddress = addressData.result.address.address;
         }
       }

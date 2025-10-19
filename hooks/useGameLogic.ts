@@ -26,9 +26,11 @@ export const useGameLogic = (isSdkReady: boolean) => {
   const [isMoving, setIsMoving] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [hasSubmittedScore, setHasSubmittedScore] = useState(false);
+  
   const moveTimeoutRef = useRef<number | null>(null);
   const gameIdRef = useRef(0); // Used to invalidate stale async operations
-  
+  const newGameLoadingRef = useRef(false); // Used to prevent concurrent new game starts
+
   // State for deterministic gameplay, as per the new architecture
   const [seed, setSeed] = useState<string | null>(null);
   const [startTime, setStartTime] = useState<number | null>(null);
@@ -36,9 +38,8 @@ export const useGameLogic = (isSdkReady: boolean) => {
   const [prng, setPrng] = useState<SeededRandom | null>(null);
 
   const newGame = useCallback(async () => {
-    // Prevent multiple new games from starting concurrently. `isMoving` is used
-    // as the loading state for new game creation.
-    if (isMoving) {
+    // Prevent multiple new games from starting concurrently.
+    if (newGameLoadingRef.current) {
       return;
     }
     
@@ -54,7 +55,8 @@ export const useGameLogic = (isSdkReady: boolean) => {
     // from persisting while new game data is fetched.
     setTiles([]);
     
-    setIsMoving(true); // Use isMoving as a loading state for new game creation
+    newGameLoadingRef.current = true;
+    setIsMoving(true); // Use isMoving to block tile movements during game creation
     
     try {
       // 1. Fetch randomness and server time for seed generation
@@ -103,8 +105,9 @@ export const useGameLogic = (isSdkReady: boolean) => {
       // Handle error, maybe show a toast to the user
     } finally {
       setIsMoving(false);
+      newGameLoadingRef.current = false;
     }
-  }, [userAddress, isMoving]);
+  }, [userAddress]);
 
   useEffect(() => {
     if (!isSdkReady) return;
