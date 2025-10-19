@@ -8,14 +8,14 @@ import { farcasterMiniApp } from '@farcaster/miniapp-wagmi-connector';
 // The values below are plausible placeholders for a testnet or future mainnet.
 // Update the id, rpc URL, and explorer URL as needed.
 const monad = defineChain({
-  id: 8453, // Using Base chain ID as a placeholder. REPLACE with Monad's actual chain ID.
-  name: 'Monad',
-  nativeCurrency: { name: 'MONAD', symbol: 'MONAD', decimals: 18 },
+  id: 10143, // Using Base chain ID as a placeholder. REPLACE with Monad's actual chain ID.
+  name: 'Monad Testnet',
+  nativeCurrency: { name: 'MONAD', symbol: 'MON', decimals: 18 },
   rpcUrls: {
-    default: { http: ['https://mainnet.monad.xyz'] }, // REPLACE with the correct RPC URL for Monad.
+    default: { http: ['https://monad-testnet.drpc.org'] }, // REPLACE with the correct RPC URL for Monad.
   },
   blockExplorers: {
-    default: { name: 'MonadScan', url: 'https://scan.monad.xyz' }, // REPLACE with the correct block explorer URL.
+    default: { name: 'MonadScan', url: 'https://monad-testnet.socialscan.io/' }, // REPLACE with the correct block explorer URL.
   },
 });
 // --- END OF CHAIN DEFINITION ---
