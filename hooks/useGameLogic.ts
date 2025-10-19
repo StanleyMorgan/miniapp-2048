@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { sdk } from '@farcaster/miniapp-sdk';
 import type { TileData } from '../types';
 import {
@@ -26,6 +26,7 @@ export const useGameLogic = (isSdkReady: boolean) => {
   const [isMoving, setIsMoving] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [hasSubmittedScore, setHasSubmittedScore] = useState(false);
+  const moveTimeoutRef = useRef<number | null>(null);
   
   // State for deterministic gameplay, as per the new architecture
   const [seed, setSeed] = useState<string | null>(null);
@@ -34,6 +35,9 @@ export const useGameLogic = (isSdkReady: boolean) => {
   const [prng, setPrng] = useState<SeededRandom | null>(null);
 
   const newGame = useCallback(async () => {
+    if (moveTimeoutRef.current) {
+      clearTimeout(moveTimeoutRef.current);
+    }
     setIsMoving(true); // Use isMoving as a loading state for new game creation
     
     try {
@@ -256,7 +260,7 @@ export const useGameLogic = (isSdkReady: boolean) => {
           return updatedMoves;
         });
 
-        setTimeout(() => {
+        moveTimeoutRef.current = window.setTimeout(() => {
           const tilesAfterAnimation = newTiles.map(t => ({ ...t, isMerged: false }));
           const finalTiles = addRandomTile(tilesAfterAnimation, prng);
           setTiles(finalTiles);
