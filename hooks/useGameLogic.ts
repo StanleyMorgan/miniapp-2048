@@ -21,7 +21,6 @@ const ANIMATION_DURATION = 200;
 const INITIAL_MOVES_HASH = '0x' + '0'.repeat(64);
 
 export const useGameLogic = (isSdkReady: boolean, activeSeason: Season) => {
-  console.log('useGameLogic hook initialized.');
   const [isInitializing, setIsInitializing] = useState(true);
   const [userAddress, setUserAddress] = useState<string | null>(null);
   const [tiles, setTiles] = useState<TileData[]>([]);
@@ -99,14 +98,15 @@ export const useGameLogic = (isSdkReady: boolean, activeSeason: Season) => {
 
 
   const newGame = useCallback(async () => {
-    console.log('newGame: starting.');
+    console.log('[newGame] CALLED.');
     if (newGameLoadingRef.current) {
-        console.log('newGame: already loading, returning.');
+        console.log('[newGame] Aborting: already loading.');
         return;
     }
     gameIdRef.current++;
     if (moveTimeoutRef.current) clearTimeout(moveTimeoutRef.current);
 
+    console.log('[newGame] Resetting state.');
     setTiles([]);
     setScore(0);
     setIsGameOver(false);
@@ -125,20 +125,19 @@ export const useGameLogic = (isSdkReady: boolean, activeSeason: Season) => {
     setIsMoving(true);
     
     try {
-      console.log('newGame: fetching /api/start-game');
+      console.log('[newGame] Fetching new game data from /api/start-game.');
       const response = await fetch('/api/start-game');
       if (!response.ok) throw new Error(`Failed to start a new game session. Status: ${response.status}`);
       const { randomness: newRandomness, startTime: newStartTime } = await response.json();
-      console.log('newGame: received randomness and startTime.');
 
       const dataToHash = `${newRandomness}${userAddressRef.current ?? ''}${newStartTime}`;
       const encoder = new TextEncoder();
       const data = encoder.encode(dataToHash);
-      const hashBuffer = await crypto.subtle.digest('SHA-265', data);
+      const hashBuffer = await crypto.subtle.digest('SHA-256', data);
       const hashArray = Array.from(new Uint8Array(hashBuffer));
       const newSeed = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
-      console.log('newGame: generating seed and initial tiles.');
 
+      console.log('[newGame] Generating seed and initial tiles.');
       const newPrng = new SeededRandom(newSeed);
       const { initialTiles, newCounter } = generateInitialTiles(newPrng);
       
@@ -148,125 +147,129 @@ export const useGameLogic = (isSdkReady: boolean, activeSeason: Season) => {
       
       tileIdCounterRef.current = newCounter;
       
+      console.log('[newGame] Setting new game state.');
       setRandomness(newRandomness);
       setSeed(newSeed);
       setStartTime(newStartTime);
       setPrng(newPrng);
       setTiles(initialTiles);
-      console.log('newGame: finished successfully.');
 
     } catch (error) {
-      console.error(`Error starting new game:`, error);
+      console.error(`[newGame] Error starting new game:`, error);
     } finally {
       setIsMoving(false);
       newGameLoadingRef.current = false;
-      console.log('newGame: finally block executed.');
+      console.log('[newGame] FINISHED.');
     }
   }, []);
 
-  // This single useEffect now controls all initialization and re-initialization logic.
-  // It runs when the SDK is ready, and critically, whenever the activeSeason changes.
+  // Main initialization effect. This is the orchestrator for loading games when the season changes.
   useEffect(() => {
     if (!isSdkReady) {
-        console.log('Initialization waiting for SDK to be ready.');
-        return;
+      console.log(`[MainEffect] Skip: SDK not ready for season '${activeSeason}'.`);
+      return;
     }
 
+    console.log(`[MainEffect] START for season: ${activeSeason}`);
+    
+    // STEP 1: Immediately set initializing flag and synchronously clear the board state.
+    // This is the CRITICAL FIX to prevent the previous season's state from "bleeding"
+    // into the new season and being incorrectly saved by the save effect.
+    setIsInitializing(true);
+    setTiles([]);
+    setScore(0);
+    setIsGameOver(false);
+    setIsWon(false);
+    // Keep other state like best scores, as they are not season-specific game states.
+
     const initializeGameForSeason = async () => {
-        console.log(`Initializing game for season: ${activeSeason}`);
-        // Step 1: Immediately set the initializing flag. This ensures the UI shows a loading
-        // state instead of stale data from a previous season during the async operations below.
-        setIsInitializing(true);
-
-        // Step 2: Fetch user data and leaderboard scores. This is not part of the core
-        // game state but is needed for the UI (e.g., "Best" score).
-        try {
-            const res = await sdk.quickAuth.fetch('/api/user-info');
-            if (res.ok) {
-                const data = await res.json();
-                setUserAddress(data.primaryAddress || null);
-            }
-        } catch (error) { console.error('Error fetching user info:', error); }
-
+      // Fetch user data and best scores. This can happen while we prepare the game board.
+      try {
+        const res = await sdk.quickAuth.fetch('/api/user-info');
+        if (res.ok) {
+          const data = await res.json();
+          setUserAddress(data.primaryAddress || null);
+        }
         const localBest = parseInt(localStorage.getItem(BEST_SCORE_KEY) || '0', 10);
         let finalBestScore = localBest;
-        try {
-            const authResult = await sdk.quickAuth.getToken();
-            if ('token' in authResult) {
-                const response = await fetch('/api/leaderboard', { headers: { 'Authorization': `Bearer ${authResult.token}` } });
-                if (response.ok) {
-                    const leaderboardData: { isCurrentUser?: boolean; score: number }[] = await response.json();
-                    const currentUserEntry = leaderboardData.find(entry => entry.isCurrentUser);
-                    if (currentUserEntry) {
-                        setFarcasterBestScore(currentUserEntry.score || 0);
-                        finalBestScore = Math.max(localBest, currentUserEntry.score || 0);
-                    } else { 
-                        setFarcasterBestScore(0); 
-                    }
-                }
-            }
-        } catch (error) {
-            console.error('Error fetching server best score:', error);
-            setFarcasterBestScore(null);
+        const authResult = await sdk.quickAuth.getToken();
+        if ('token' in authResult) {
+          const response = await fetch('/api/leaderboard', { headers: { 'Authorization': `Bearer ${authResult.token}` } });
+          if (response.ok) {
+            const leaderboardData: { isCurrentUser?: boolean; score: number }[] = await response.json();
+            const currentUserEntry = leaderboardData.find(entry => entry.isCurrentUser);
+            setFarcasterBestScore(currentUserEntry?.score ?? 0);
+            finalBestScore = Math.max(localBest, currentUserEntry?.score ?? 0);
+          }
         }
         setBestScore(finalBestScore);
         if (finalBestScore > localBest) localStorage.setItem(BEST_SCORE_KEY, finalBestScore.toString());
+      } catch (error) {
+        console.error('[MainEffect] Error fetching user/leaderboard data:', error);
+        setFarcasterBestScore(null);
+      }
+      
+      // STEP 2: Attempt to load the game state for the currently active season.
+      const GAME_STATE_KEY = `gameState2048_${activeSeason}`;
+      const savedStateJSON = localStorage.getItem(GAME_STATE_KEY);
+      let loadedFromSave = false;
 
-        // Step 3: Load the specific game state for the currently active season.
-        const GAME_STATE_KEY = `gameState2048_${activeSeason}`;
-        const savedStateJSON = localStorage.getItem(GAME_STATE_KEY);
-        let loadedFromSave = false;
+      if (savedStateJSON) {
+        try {
+          const savedState = JSON.parse(savedStateJSON);
+          if (savedState.randomness && savedState.finalMovesHash) {
+            console.log(`[MainEffect] Loading saved state for ${activeSeason}:`, {score: savedState.score, tilesCount: savedState.tiles.length});
+            setTiles(savedState.tiles);
+            setScore(savedState.score);
+            setIsGameOver(savedState.isGameOver || false);
+            setIsWon(savedState.isWon || false);
+            setSeed(savedState.seed);
+            setStartTime(savedState.startTime);
+            setMoves(savedState.moves);
+            setRandomness(savedState.randomness);
+            setFinalMovesHash(savedState.finalMovesHash);
+            
+            const loadedPrng = new SeededRandom(savedState.seed);
+            const prngCalls = 4 + (savedState.moves.length * 2);
+            for (let i = 0; i < prngCalls; i++) loadedPrng.next();
+            setPrng(loadedPrng);
 
-        if (savedStateJSON) {
-            console.log(`Found and loading saved state for season: ${activeSeason}`);
-            try {
-                const savedState = JSON.parse(savedStateJSON);
-                if (savedState.randomness && savedState.finalMovesHash) {
-                    setTiles(savedState.tiles);
-                    setScore(savedState.score);
-                    setIsGameOver(savedState.isGameOver || false);
-                    setIsWon(savedState.isWon || false);
-                    setSeed(savedState.seed);
-                    setStartTime(savedState.startTime);
-                    setMoves(savedState.moves);
-                    setRandomness(savedState.randomness);
-                    setFinalMovesHash(savedState.finalMovesHash);
-                    
-                    const loadedPrng = new SeededRandom(savedState.seed);
-                    const prngCalls = 4 + (savedState.moves.length * 2);
-                    for (let i = 0; i < prngCalls; i++) loadedPrng.next();
-                    setPrng(loadedPrng);
-
-                    const maxId = savedState.tiles.reduce((max: number, t: TileData) => Math.max(max, t.id), 0);
-                    tileIdCounterRef.current = maxId + 1;
-                    loadedFromSave = true;
-                } else {
-                    localStorage.removeItem(GAME_STATE_KEY);
-                }
-            } catch (e) {
-                console.error("Failed to parse saved game state, starting a new game instead.", e);
-                localStorage.removeItem(GAME_STATE_KEY);
-            }
+            const maxId = savedState.tiles.reduce((max: number, t: TileData) => Math.max(max, t.id), 0);
+            tileIdCounterRef.current = maxId + 1;
+            loadedFromSave = true;
+          } else {
+            console.warn(`[MainEffect] Found invalid saved state for ${activeSeason}. Discarding.`);
+            localStorage.removeItem(GAME_STATE_KEY);
+          }
+        } catch (e) {
+          console.error(`[MainEffect] Failed to parse saved state for ${activeSeason}, starting new game.`, e);
+          localStorage.removeItem(GAME_STATE_KEY);
         }
+      }
 
-        // Step 4: If no valid save state was found for this season, start a completely new game.
-        if (!loadedFromSave) {
-            console.log(`No saved state for season: ${activeSeason}. Starting a new game.`);
-            await newGame();
-        }
+      // STEP 3: If no valid save state was found, start a completely new game.
+      if (!loadedFromSave) {
+        console.log(`[MainEffect] No saved state for ${activeSeason}. Calling newGame().`);
+        await newGame();
+      }
 
-        // Step 5: All loading and setup is complete.
-        setIsInitializing(false);
-        console.log(`Initialization finished for season: ${activeSeason}`);
+      // STEP 4: All loading and setup is complete.
+      setIsInitializing(false);
+      console.log(`[MainEffect] FINISH for season: ${activeSeason}. Final score: ${score}`);
     };
 
     initializeGameForSeason();
   }, [isSdkReady, activeSeason]);
   
+  // Game state saving effect
   useEffect(() => {
-    if (!isInitializing && tiles.length > 0 && seed) {
+    const shouldSave = !isInitializing && tiles.length > 0 && seed;
+    console.log(`[SaveEffect] Check. season=${activeSeason}, isInitializing=${isInitializing}, shouldSave=${shouldSave}`);
+
+    if (shouldSave) {
       const GAME_STATE_KEY = `gameState2048_${activeSeason}`;
       const gameState = { tiles, score, isGameOver, isWon, seed, startTime, moves, randomness, finalMovesHash };
+      console.log(`[SaveEffect] SAVING state for ${activeSeason}:`, { score: gameState.score, tilesCount: gameState.tiles.length });
       localStorage.setItem(GAME_STATE_KEY, JSON.stringify(gameState));
     }
   }, [tiles, score, isGameOver, isWon, isInitializing, seed, startTime, moves, randomness, finalMovesHash, activeSeason]);
@@ -295,10 +298,7 @@ export const useGameLogic = (isSdkReady: boolean, activeSeason: Season) => {
         if (!isConnected) {
           setSubmissionStatus('Connecting wallet...');
           connect({ connector: connectors[0] });
-          // The submission will be re-triggered by the user after connecting.
-          // Or we could use an effect to watch for `isConnected` to become true.
-          // For now, let the user re-click.
-          setIsSubmitting(false); // Allow re-click after connection.
+          setIsSubmitting(false);
           return;
         }
 
@@ -313,13 +313,13 @@ export const useGameLogic = (isSdkReady: boolean, activeSeason: Season) => {
         const packedBoard = packBoard(tiles);
         const endTime = Date.now();
         const args = [
-            BigInt(packedBoard), // uint128
-            BigInt(score), // uint64
-            BigInt(startTime), // uint64
-            BigInt(endTime), // uint64
-            ('0x' + seed) as `0x${string}`, // bytes32
-            ('0x' + randomness) as `0x${string}`, // bytes32
-            finalMovesHash as `0x${string}` // bytes32
+            BigInt(packedBoard),
+            BigInt(score),
+            BigInt(startTime),
+            BigInt(endTime),
+            ('0x' + seed) as `0x${string}`,
+            ('0x' + randomness) as `0x${string}`,
+            finalMovesHash as `0x${string}`
         ];
 
         writeContract({
