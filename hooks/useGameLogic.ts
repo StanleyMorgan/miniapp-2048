@@ -27,6 +27,7 @@ export const useGameLogic = (isSdkReady: boolean) => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [hasSubmittedScore, setHasSubmittedScore] = useState(false);
   const moveTimeoutRef = useRef<number | null>(null);
+  const gameIdRef = useRef(0); // Used to invalidate stale async operations
   
   // State for deterministic gameplay, as per the new architecture
   const [seed, setSeed] = useState<string | null>(null);
@@ -35,14 +36,16 @@ export const useGameLogic = (isSdkReady: boolean) => {
   const [prng, setPrng] = useState<SeededRandom | null>(null);
 
   const newGame = useCallback(async () => {
+    // Increment the game ID to invalidate any pending operations from the previous game.
+    gameIdRef.current++;
+    
     // Immediately cancel any pending move animation timeout from the previous game.
     if (moveTimeoutRef.current) {
       clearTimeout(moveTimeoutRef.current);
       moveTimeoutRef.current = null;
     }
     // Synchronously clear the board to prevent tiles from the previous game
-    // from persisting while new game data is fetched. This prevents race
-    // conditions that can lead to corrupted state and errors.
+    // from persisting while new game data is fetched.
     setTiles([]);
     
     setIsMoving(true); // Use isMoving as a loading state for new game creation
@@ -249,6 +252,8 @@ export const useGameLogic = (isSdkReady: boolean) => {
   const performMove = useCallback((direction: 'up' | 'down' | 'left' | 'right') => {
     if (isGameOver || isMoving || !prng) return;
 
+    // Capture the game ID at the start of the move to handle race conditions.
+    const gameIdAtMoveStart = gameIdRef.current;
     const { newTiles, mergedTiles, scoreIncrease, hasMoved } = move(tiles, direction);
     
     if (hasMoved) {
@@ -268,6 +273,13 @@ export const useGameLogic = (isSdkReady: boolean) => {
         });
 
         moveTimeoutRef.current = window.setTimeout(() => {
+          // Before updating state, check if a new game has started in the meantime.
+          // This prevents the animation callback from a previous game from corrupting
+          // the state of the current game.
+          if (gameIdRef.current !== gameIdAtMoveStart) {
+            return;
+          }
+
           const tilesAfterAnimation = newTiles.map(t => ({ ...t, isMerged: false }));
           const finalTiles = addRandomTile(tilesAfterAnimation, prng);
           setTiles(finalTiles);
