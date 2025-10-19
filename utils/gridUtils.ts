@@ -41,17 +41,14 @@ export class SeededRandom {
 const tilesToGrid = (tiles: TileData[]): Grid => {
   const grid: Grid = Array(GRID_SIZE).fill(null).map(() => Array(GRID_SIZE).fill(null));
   
-  // Defensive check to find the root cause of the error.
   if (!Array.isArray(tiles)) {
     console.error('[tilesToGrid] FATAL: input `tiles` is not an array. Received:', tiles);
-    // Returning an empty grid to prevent a hard crash.
     return grid;
   }
 
   tiles.forEach((tile, index) => {
     if (!tile || typeof tile.row === 'undefined' || typeof tile.col === 'undefined') {
         console.error(`[tilesToGrid] FATAL: Invalid tile object found at index ${index}. Tile data:`, JSON.stringify(tile), 'Full tiles array:', JSON.stringify(tiles));
-        // Skip this invalid tile to prevent a crash.
         return;
     }
 
@@ -83,11 +80,6 @@ const getEmptyCells = (grid: Grid): { row: number; col: number }[] => {
  * @returns An object containing the new array of tiles and the next available tile ID.
  */
 export const addRandomTile = (tiles: TileData[], prng: SeededRandom, tileIdCounter: number): { newTiles: TileData[], newCounter: number } => {
-  if (!prng || typeof prng.next !== 'function') {
-    console.error('[addRandomTile] CRITICAL: Received invalid `prng` object!', prng);
-    throw new Error("Invalid PRNG provided to addRandomTile");
-  }
-
   const grid = tilesToGrid(tiles);
   const emptyCells = getEmptyCells(grid);
   if (emptyCells.length === 0) {
@@ -95,19 +87,7 @@ export const addRandomTile = (tiles: TileData[], prng: SeededRandom, tileIdCount
   }
 
   const cellIndex = Math.floor(prng.next() * emptyCells.length);
-  const cell = emptyCells[cellIndex];
-  
-  // This check is left as a final safeguard, but the root cause in SeededRandom.next() is fixed.
-  if (!cell) {
-    console.error('[addRandomTile] CRITICAL: `cell` is undefined. This should not happen after PRNG fix.', {
-      cellIndex,
-      emptyCellsLength: emptyCells.length,
-    });
-    // Throw an error to halt execution, as continuing would violate game verifiability.
-    throw new Error("Game state corruption detected in addRandomTile.");
-  }
-
-  const { row, col } = cell;
+  const { row, col } = emptyCells[cellIndex];
   
   // The value is 2 with 90% probability, and 4 with 10% probability.
   const value = prng.next() < 0.9 ? 2 : 4;
@@ -122,17 +102,14 @@ export const addRandomTile = (tiles: TileData[], prng: SeededRandom, tileIdCount
  * @returns An object containing the array of initial tiles and the next available tile ID.
  */
 export const generateInitialTiles = (prng: SeededRandom): { initialTiles: TileData[], newCounter: number } => {
-  console.log('[generateInitialTiles] Starting generation.');
   let tileIdCounter = 1;
   let initialTiles: TileData[] = [];
   
   const res1 = addRandomTile(initialTiles, prng, tileIdCounter);
   initialTiles = res1.newTiles;
   tileIdCounter = res1.newCounter;
-  console.log('[generateInitialTiles] After first tile:', JSON.stringify(initialTiles));
 
   const res2 = addRandomTile(initialTiles, prng, tileIdCounter);
-  console.log('[generateInitialTiles] After second tile:', JSON.stringify(res2.newTiles));
 
   return { initialTiles: res2.newTiles, newCounter: res2.newCounter };
 };

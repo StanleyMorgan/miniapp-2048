@@ -81,4 +81,4 @@ const Tile: React.FC<TileData> = ({ value, row, col, isNew, isMerged }) => {
   );
 };
 
-export default Tile;
+export default React.memo(Tile);
