@@ -170,7 +170,8 @@ export const useGameLogic = (isSdkReady: boolean, activeSeason: Season) => {
       if (savedStateJSON) {
         try {
           const savedState = JSON.parse(savedStateJSON);
-          if (savedState.seed) { // Check for new state structure
+          // A valid, verifiable game state must have both a seed and the randomness value.
+          if (savedState.seed && savedState.randomness) {
             setTiles(savedState.tiles);
             setScore(savedState.score);
             setIsGameOver(savedState.isGameOver || false);
@@ -178,7 +179,7 @@ export const useGameLogic = (isSdkReady: boolean, activeSeason: Season) => {
             setSeed(savedState.seed);
             setStartTime(savedState.startTime);
             setMoves(savedState.moves);
-            setRandomness(savedState.randomness || null);
+            setRandomness(savedState.randomness);
             
             // Re-create the PRNG and fast-forward it to the correct state
             const loadedPrng = new SeededRandom(savedState.seed);
@@ -195,6 +196,11 @@ export const useGameLogic = (isSdkReady: boolean, activeSeason: Season) => {
             tileIdCounterRef.current = maxId + 1;
 
             loadedFromSave = true;
+          } else {
+            // If the state is from an older version (e.g., has a seed but no randomness),
+            // it's not verifiable. We must start a new game.
+            console.warn("Saved game state is from an older version or is invalid. Starting a new game.");
+            localStorage.removeItem(GAME_STATE_KEY);
           }
         } catch (e) {
           console.error("Failed to parse saved game state.", e);
