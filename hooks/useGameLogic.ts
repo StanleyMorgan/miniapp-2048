@@ -27,6 +27,7 @@ export const useGameLogic = (isSdkReady: boolean) => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [hasSubmittedScore, setHasSubmittedScore] = useState(false);
   
+  const tileIdCounterRef = useRef(1); // Manages unique tile IDs safely within the hook.
   const moveTimeoutRef = useRef<number | null>(null);
   const gameIdRef = useRef(0); // Used to invalidate stale async operations
   const newGameLoadingRef = useRef(false); // Used to prevent concurrent new game starts
@@ -96,8 +97,9 @@ export const useGameLogic = (isSdkReady: boolean) => {
       // 3. Initialize PRNG with the new seed
       const newPrng = new SeededRandom(newSeed);
 
-      // 4. Generate initial tiles using the PRNG
-      const { initialTiles } = generateInitialTiles(newPrng);
+      // 4. Generate initial tiles using the PRNG and reset the tile ID counter
+      const { initialTiles, newCounter } = generateInitialTiles(newPrng);
+      tileIdCounterRef.current = newCounter;
       
       // 5. Set the final state for the new game.
       setSeed(newSeed);
@@ -183,6 +185,10 @@ export const useGameLogic = (isSdkReady: boolean) => {
               loadedPrng.next();
             }
             setPrng(loadedPrng);
+
+            // Restore the tile ID counter to the next available ID
+            const maxId = savedState.tiles.reduce((max: number, t: TileData) => Math.max(max, t.id), 0);
+            tileIdCounterRef.current = maxId + 1;
 
             loadedFromSave = true;
           }
@@ -298,7 +304,13 @@ export const useGameLogic = (isSdkReady: boolean) => {
           }
 
           const tilesAfterAnimation = newTiles.map(t => ({ ...t, isMerged: false }));
-          const finalTiles = addRandomTile(tilesAfterAnimation, prng);
+          const { newTiles: finalTiles, newCounter } = addRandomTile(
+            tilesAfterAnimation, 
+            prng,
+            tileIdCounterRef.current
+          );
+          tileIdCounterRef.current = newCounter;
+          
           setTiles(finalTiles);
           setIsMoving(false);
 

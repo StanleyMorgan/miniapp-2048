@@ -1,7 +1,6 @@
 import type { TileData, Grid } from '../types';
 
 const GRID_SIZE = 4;
-let tileIdCounter = 1;
 
 /**
  * A simple seeded pseudo-random number generator (PRNG) using LCG algorithm.
@@ -62,12 +61,15 @@ const getEmptyCells = (grid: Grid): { row: number; col: number }[] => {
  * The position and value of the tile are determined by the provided PRNG.
  * @param tiles The current array of tiles.
  * @param prng The seeded random number generator instance.
- * @returns A new array of tiles including the newly added one.
+ * @param tileIdCounter The current ID to assign to the new tile.
+ * @returns An object containing the new array of tiles and the next available tile ID.
  */
-export const addRandomTile = (tiles: TileData[], prng: SeededRandom): TileData[] => {
+export const addRandomTile = (tiles: TileData[], prng: SeededRandom, tileIdCounter: number): { newTiles: TileData[], newCounter: number } => {
   const grid = tilesToGrid(tiles);
   const emptyCells = getEmptyCells(grid);
-  if (emptyCells.length === 0) return tiles;
+  if (emptyCells.length === 0) {
+    return { newTiles: tiles, newCounter: tileIdCounter };
+  }
 
   const cellIndex = Math.floor(prng.next() * emptyCells.length);
   const { row, col } = emptyCells[cellIndex];
@@ -75,21 +77,26 @@ export const addRandomTile = (tiles: TileData[], prng: SeededRandom): TileData[]
   // The value is 2 with 90% probability, and 4 with 10% probability.
   const value = prng.next() < 0.9 ? 2 : 4;
   
-  const newTile: TileData = { id: tileIdCounter++, value, row, col, isNew: true };
-  return [...tiles, newTile];
+  const newTile: TileData = { id: tileIdCounter, value, row, col, isNew: true };
+  return { newTiles: [...tiles, newTile], newCounter: tileIdCounter + 1 };
 };
 
 /**
  * Generates the initial two tiles for a new game.
  * @param prng The seeded random number generator to ensure determinism.
- * @returns An object containing the array of initial tiles.
+ * @returns An object containing the array of initial tiles and the next available tile ID.
  */
-export const generateInitialTiles = (prng: SeededRandom) => {
-  tileIdCounter = 1;
+export const generateInitialTiles = (prng: SeededRandom): { initialTiles: TileData[], newCounter: number } => {
+  let tileIdCounter = 1;
   let initialTiles: TileData[] = [];
-  initialTiles = addRandomTile(initialTiles, prng);
-  initialTiles = addRandomTile(initialTiles, prng);
-  return { initialTiles };
+  
+  const res1 = addRandomTile(initialTiles, prng, tileIdCounter);
+  initialTiles = res1.newTiles;
+  tileIdCounter = res1.newCounter;
+
+  const res2 = addRandomTile(initialTiles, prng, tileIdCounter);
+
+  return { initialTiles: res2.newTiles, newCounter: res2.newCounter };
 };
 
 const rotateGrid = (grid: (TileData | null)[][]): (TileData | null)[][] => {
