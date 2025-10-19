@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { sdk } from '@farcaster/miniapp-sdk';
-import { useAccount, useConnect, useWriteContract, useWaitForTransactionReceipt } from 'wagmi';
+import { useAccount, useConnect, useWriteContract, useWaitForTransactionReceipt, useReadContract } from 'wagmi';
 import type { TileData } from '../types';
 import {
   generateInitialTiles,
@@ -13,22 +13,8 @@ import {
   hexToUint8Array,
 } from '../utils/gridUtils';
 import { Season } from '../components/SeasonSelector';
+import { MONAD_LEADERBOARD_ADDRESS, MONAD_LEADERBOARD_ABI } from '../constants/contract';
 
-// --- MONAD S0 CONTRACT DETAILS ---
-// The contract address is now loaded from a Vite environment variable.
-// Create a .env.local file in your project root and add:
-// VITE_MONAD_CONTRACT_ADDRESS=0xYourContractAddressHere
-// @FIX: Cast `import.meta` to `any` to avoid TypeScript error when accessing `env`.
-const MONAD_LEADERBOARD_ADDRESS = (import.meta as any).env.VITE_MONAD_CONTRACT_ADDRESS as `0x${string}`;
-
-const MONAD_LEADERBOARD_ABI = [
-  {"inputs":[{"internalType":"address","name":"player","type":"address"},{"internalType":"uint64","name":"score","type":"uint64"}],"name":"GameSubmitted","type":"event","anonymous":false},
-  {"inputs":[],"name":"getLeaderboard","outputs":[{"components":[{"internalType":"address","name":"player","type":"address"},{"internalType":"uint64","name":"score","type":"uint64"}],"internalType":"struct GameLeaderboard.Leader[]","name":"","type":"tuple[]"}],"stateMutability":"view","type":"function"},
-  {"inputs":[{"internalType":"uint256","name":"","type":"uint256"}],"name":"leaderboard","outputs":[{"internalType":"address","name":"player","type":"address"},{"internalType":"uint64","name":"score","type":"uint64"}],"stateMutability":"view","type":"function"},
-  {"inputs":[{"internalType":"address","name":"","type":"address"}],"name":"results","outputs":[{"internalType":"uint128","name":"packedBoard","type":"uint128"},{"internalType":"uint64","name":"score","type":"uint64"},{"internalType":"uint64","name":"startTime","type":"uint64"},{"internalType":"uint64","name":"endTime","type":"uint64"},{"internalType":"bytes32","name":"seed","type":"bytes32"},{"internalType":"bytes32","name":"randomness","type":"bytes32"},{"internalType":"bytes32","name":"movesHash","type":"bytes32"}],"stateMutability":"view","type":"function"},
-  {"inputs":[{"internalType":"uint128","name":"packedBoard","type":"uint128"},{"internalType":"uint64","name":"score","type":"uint64"},{"internalType":"uint64","name":"startTime","type":"uint64"},{"internalType":"uint64","name":"endTime","type":"uint64"},{"internalType":"bytes32","name":"seed","type":"bytes32"},{"internalType":"bytes32","name":"randomness","type":"bytes32"},{"internalType":"bytes32","name":"movesHash","type":"bytes32"}],"name":"submitGame","outputs":[],"stateMutability":"external","type":"function"}
-];
-// --- END OF CONTRACT DETAILS ---
 
 const BEST_SCORE_KEY = 'bestScore2048';
 const GAME_STATE_KEY = 'gameState2048';
@@ -42,6 +28,7 @@ export const useGameLogic = (isSdkReady: boolean, activeSeason: Season) => {
   const [tiles, setTiles] = useState<TileData[]>([]);
   const [score, setScore] = useState(0);
   const [bestScore, setBestScore] = useState(0);
+  const [farcasterBestScore, setFarcasterBestScore] = useState<number | null>(null);
   const [serverBestScore, setServerBestScore] = useState<number | null>(null);
   const [userRank, setUserRank] = useState<number | null>(null);
   const [isGameOver, setIsGameOver] = useState(false);
@@ -64,12 +51,31 @@ export const useGameLogic = (isSdkReady: boolean, activeSeason: Season) => {
   const [prng, setPrng] = useState<SeededRandom | null>(null);
 
   // --- WAGMI HOOKS FOR ON-CHAIN INTERACTION ---
-  // @FIX: Destructure `chain` from `useAccount` to use for the `writeContract` call.
   const { address: wagmiAddress, isConnected, chain } = useAccount();
   const { connect, connectors } = useConnect();
   const { data: hash, writeContract, isPending, error: writeContractError } = useWriteContract();
   const { isLoading: isConfirming, isSuccess: isConfirmed, error: txReceiptError } = useWaitForTransactionReceipt({ hash });
   
+  const { data: onChainResult } = useReadContract({
+    address: MONAD_LEADERBOARD_ADDRESS,
+    abi: MONAD_LEADERBOARD_ABI,
+    functionName: 'results',
+    args: [userAddress as `0x${string}`],
+    query: {
+      enabled: isSdkReady && !!userAddress && activeSeason === 'monad-s0',
+    }
+  });
+
+  // Effect to switch the displayed server best score based on the active season
+  useEffect(() => {
+    if (activeSeason === 'monad-s0') {
+      const onChainScore = onChainResult?.[1]; // score is at index 1
+      setServerBestScore(typeof onChainScore === 'bigint' ? Number(onChainScore) : 0);
+    } else {
+      setServerBestScore(farcasterBestScore);
+    }
+  }, [activeSeason, onChainResult, farcasterBestScore]);
+
   // Effect to manage submission status based on wagmi state changes
   useEffect(() => {
     if (isPending) {
@@ -188,11 +194,11 @@ export const useGameLogic = (isSdkReady: boolean, activeSeason: Season) => {
               const leaderboardData: { isCurrentUser?: boolean; score: number }[] = await response.json();
               const currentUserEntry = leaderboardData.find(entry => entry.isCurrentUser);
               if (currentUserEntry) {
-                setServerBestScore(currentUserEntry.score || 0);
+                setFarcasterBestScore(currentUserEntry.score || 0);
                 finalBestScore = Math.max(localBest, currentUserEntry.score || 0);
                 console.log(`initializeGame: server best score is ${currentUserEntry.score}. Final best: ${finalBestScore}`);
               } else { 
-                setServerBestScore(0); 
+                setFarcasterBestScore(0); 
                 console.log('initializeGame: user not on leaderboard. Server best score is 0.');
               }
             }
@@ -201,7 +207,7 @@ export const useGameLogic = (isSdkReady: boolean, activeSeason: Season) => {
           }
       } catch (error) {
         console.error('Error fetching server best score:', error);
-        setServerBestScore(null);
+        setFarcasterBestScore(null);
       }
       setBestScore(finalBestScore);
       if (finalBestScore > localBest) localStorage.setItem(BEST_SCORE_KEY, finalBestScore.toString());
@@ -293,7 +299,6 @@ export const useGameLogic = (isSdkReady: boolean, activeSeason: Season) => {
            throw new Error(`Wallet mismatch. Please connect with ${userAddress.slice(0,6)}...${userAddress.slice(-4)}`);
         }
 
-        // @FIX: Add a check to ensure the user is on the correct chain.
         if (!chain) {
           throw new Error('Please switch to the Monad network in your wallet.');
         }
@@ -310,7 +315,6 @@ export const useGameLogic = (isSdkReady: boolean, activeSeason: Season) => {
             finalMovesHash as `0x${string}` // bytes32
         ];
 
-        // @FIX: Pass `account` and `chain` to the `writeContract` call to satisfy its type requirements.
         writeContract({
           address: MONAD_LEADERBOARD_ADDRESS,
           abi: MONAD_LEADERBOARD_ABI,
@@ -338,7 +342,7 @@ export const useGameLogic = (isSdkReady: boolean, activeSeason: Season) => {
 
       if (res.ok) {
         setHasSubmittedScore(true);
-        setServerBestScore(prev => Math.max(prev ?? 0, score));
+        setFarcasterBestScore(prev => Math.max(prev ?? 0, score));
         try {
           const authResult = await sdk.quickAuth.getToken();
           if ('token' in authResult) {

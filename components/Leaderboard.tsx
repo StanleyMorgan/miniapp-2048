@@ -1,8 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { sdk } from '@farcaster/miniapp-sdk';
+import { useReadContract, useAccount } from 'wagmi';
+import { MONAD_LEADERBOARD_ADDRESS, MONAD_LEADERBOARD_ABI } from '../constants/contract';
+import { Season } from './SeasonSelector';
 
 interface LeaderboardProps {
   isReady: boolean;
+  activeSeason: Season;
 }
 
 type LeaderboardEntry = {
@@ -13,13 +17,25 @@ type LeaderboardEntry = {
   isCurrentUser?: boolean;
 };
 
-const Leaderboard: React.FC<LeaderboardProps> = ({ isReady }) => {
+const Leaderboard: React.FC<LeaderboardProps> = ({ isReady, activeSeason }) => {
   const [leaderboardData, setLeaderboardData] = useState<LeaderboardEntry[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const { address: userAddress } = useAccount();
+
+  const { 
+    data: onChainLeaderboard, 
+    error: onChainError, 
+    isLoading: isOnChainLoading 
+  } = useReadContract({
+    address: MONAD_LEADERBOARD_ADDRESS,
+    abi: MONAD_LEADERBOARD_ABI,
+    functionName: 'getLeaderboard',
+    query: { enabled: isReady && activeSeason === 'monad-s0' }
+  });
 
   useEffect(() => {
-    const fetchLeaderboard = async () => {
+    const fetchFarcasterLeaderboard = async () => {
       setIsLoading(true);
       setError(null);
       const BACKEND_URL = '/api/leaderboard';
@@ -58,14 +74,32 @@ const Leaderboard: React.FC<LeaderboardProps> = ({ isReady }) => {
         setIsLoading(false);
       }
     };
+    
+    if (!isReady) return;
 
-    if (isReady) {
-      fetchLeaderboard();
+    if (activeSeason === 'monad-s0') {
+      if (onChainLeaderboard) {
+        const formattedData = (onChainLeaderboard as { player: string; score: bigint }[]).map((entry, index) => ({
+          rank: index + 1,
+          displayName: `${entry.player.slice(0, 6)}...${entry.player.slice(-4)}`,
+          fid: index + 1,
+          score: Number(entry.score),
+          isCurrentUser: !!userAddress && userAddress.toLowerCase() === entry.player.toLowerCase(),
+        }));
+        setLeaderboardData(formattedData);
+      }
+    } else {
+      fetchFarcasterLeaderboard();
     }
-  }, [isReady]);
+  }, [isReady, activeSeason, onChainLeaderboard, userAddress]);
 
   const renderContent = () => {
-    if (isLoading) {
+    const isMonadLoading = activeSeason === 'monad-s0' && isOnChainLoading;
+    const isMonadError = activeSeason === 'monad-s0' && onChainError;
+    const effectiveIsLoading = isLoading || isMonadLoading;
+    const effectiveError = error || (isMonadError ? 'Could not load on-chain leaderboard.' : null);
+
+    if (effectiveIsLoading) {
       return (
         <div className="flex flex-col gap-2 animate-pulse">
           {Array.from({ length: 15 }).map((_, i) => (
@@ -75,8 +109,8 @@ const Leaderboard: React.FC<LeaderboardProps> = ({ isReady }) => {
       );
     }
 
-    if (error) {
-      return <div className="text-center text-red-400 p-8" role="alert">{error}</div>;
+    if (effectiveError) {
+      return <div className="text-center text-red-400 p-8" role="alert">{effectiveError}</div>;
     }
 
     if (leaderboardData.length === 0) {
@@ -94,7 +128,7 @@ const Leaderboard: React.FC<LeaderboardProps> = ({ isReady }) => {
       <div className="flex flex-col gap-2">
         {finalLeaderboard.map(({ rank, displayName, fid, score, isCurrentUser }) => (
           <div 
-            key={`${rank}-${fid}`} 
+            key={`${rank}-${fid}-${displayName}`} 
             className={`
               grid grid-cols-3 gap-2 p-3 rounded-md items-center text-lg
               transition-colors duration-200

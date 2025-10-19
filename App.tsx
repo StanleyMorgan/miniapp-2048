@@ -155,7 +155,7 @@ const App: React.FC = () => {
         <SeasonSelector activeSeason={activeSeason} onSeasonChange={setActiveSeason} />
         
         <main className="flex-grow flex flex-col w-full items-center justify-center">
-          {activeTab === 'game' ? renderGameContent() : <Leaderboard isReady={isSdkReady} />}
+          {activeTab === 'game' ? renderGameContent() : <Leaderboard isReady={isSdkReady} activeSeason={activeSeason} />}
         </main>
       </div>
     </div>
