@@ -232,3 +232,84 @@ export const isGameOver = (tiles: TileData[]): boolean => {
     
     return true;
 };
+
+/**
+ * Verifies a game's outcome by replaying it from a seed and a list of moves.
+ * @param seed The game's deterministic seed.
+ * @param moves An array of numbers representing moves (0:up, 1:right, 2:down, 3:left).
+ * @returns An object containing the calculated final score and the final tiles array.
+ */
+export const verifyGame = (seed: string, moves: number[]): { finalScore: number, finalTiles: TileData[] } => {
+  const prng = new SeededRandom(seed);
+  let { initialTiles, newCounter } = generateInitialTiles(prng);
+  let tiles = initialTiles;
+  let score = 0;
+  let tileIdCounter = newCounter;
+  
+  const directionMap = ['up', 'right', 'down', 'left'] as const;
+
+  for (const moveDirectionIndex of moves) {
+    if (moveDirectionIndex < 0 || moveDirectionIndex > 3) continue; // Skip invalid moves
+    
+    const direction = directionMap[moveDirectionIndex];
+    const moveResult = move(tiles, direction);
+
+    if (moveResult.hasMoved) {
+      score += moveResult.scoreIncrease;
+      
+      // For verification, we skip animations. The state after a move is the `newTiles` array.
+      const tilesAfterMove = moveResult.newTiles;
+      
+      const randomTileResult = addRandomTile(tilesAfterMove, prng, tileIdCounter);
+      tiles = randomTileResult.newTiles;
+      tileIdCounter = randomTileResult.newCounter;
+    }
+  }
+
+  return { finalScore: score, finalTiles: tiles };
+};
+
+/**
+ * Packs an array of moves into a compact hex string for on-chain submission.
+ * Each move (0-3) is stored in 2 bits.
+ * @param moves An array of numbers representing moves.
+ * @returns A hex string (e.g., '0x...').
+ */
+export const packMoves = (moves: number[]): string => {
+  if (moves.length === 0) return '0x0';
+  let packed = BigInt(0);
+  for (let i = 0; i < moves.length; i++) {
+    const move = BigInt(moves[i] & 3); // Ensure move is 0-3
+    packed |= (move << BigInt(i * 2));
+  }
+  return '0x' + packed.toString(16);
+};
+
+/**
+ * Packs the final game board state into a compact 64-bit hex string.
+ * Each of the 16 tiles is represented by its log2 value (e.g., 2048 -> 11), using 4 bits.
+ * An empty cell is 0.
+ * @param tiles The final array of tiles on the board.
+ * @returns A 64-bit hex string (e.g., '0x...').
+ */
+export const packBoard = (tiles: TileData[]): string => {
+  const grid: number[][] = Array(GRID_SIZE).fill(0).map(() => Array(GRID_SIZE).fill(0));
+  tiles.forEach(tile => {
+    if (tile && tile.value > 0) {
+      // log2(value) fits into 4 bits for values up to 2^15 = 32768
+      grid[tile.row][tile.col] = Math.log2(tile.value);
+    }
+  });
+
+  let packed = BigInt(0);
+  let bitPosition = 0;
+  // The order of packing must be consistent. Row by row, left to right.
+  for (let r = 0; r < GRID_SIZE; r++) {
+    for (let c = 0; c < GRID_SIZE; c++) {
+      const tilePower = BigInt(grid[r][c]);
+      packed |= (tilePower << BigInt(bitPosition));
+      bitPosition += 4; // 4 bits per tile
+    }
+  }
+  return '0x' + packed.toString(16);
+};

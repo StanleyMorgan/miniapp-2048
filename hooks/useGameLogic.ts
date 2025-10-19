@@ -7,13 +7,17 @@ import {
   isGameOver as checkIsGameOver,
   addRandomTile,
   SeededRandom,
+  verifyGame,
+  packMoves,
+  packBoard,
 } from '../utils/gridUtils';
+import { Season } from '../components/SeasonSelector';
 
 const BEST_SCORE_KEY = 'bestScore2048';
 const GAME_STATE_KEY = 'gameState2048';
 const ANIMATION_DURATION = 200;
 
-export const useGameLogic = (isSdkReady: boolean) => {
+export const useGameLogic = (isSdkReady: boolean, activeSeason: Season) => {
   const [isInitializing, setIsInitializing] = useState(true);
   const [userAddress, setUserAddress] = useState<string | null>(null);
   const [tiles, setTiles] = useState<TileData[]>([]);
@@ -33,6 +37,7 @@ export const useGameLogic = (isSdkReady: boolean) => {
   const newGameLoadingRef = useRef(false); // Used to prevent concurrent new game starts
 
   // State for deterministic gameplay, as per the new architecture
+  const [randomness, setRandomness] = useState<string | null>(null);
   const [seed, setSeed] = useState<string | null>(null);
   const [startTime, setStartTime] = useState<number | null>(null);
   const [moves, setMoves] = useState<number[]>([]); // 0:up, 1:right, 2:down, 3:left
@@ -64,6 +69,7 @@ export const useGameLogic = (isSdkReady: boolean) => {
     setMoves([]);
     setSeed(null);
     setPrng(null);
+    setRandomness(null);
     
     // Set loading locks.
     newGameLoadingRef.current = true;
@@ -75,10 +81,10 @@ export const useGameLogic = (isSdkReady: boolean) => {
       if (!response.ok) {
         throw new Error(`Failed to start a new game session. Status: ${response.status}`);
       }
-      const { randomness, startTime: newStartTime } = await response.json();
+      const { randomness: newRandomness, startTime: newStartTime } = await response.json();
 
       // 2. Create the deterministic seed
-      const dataToHash = `${randomness}${userAddress ?? ''}${newStartTime}`;
+      const dataToHash = `${newRandomness}${userAddress ?? ''}${newStartTime}`;
       const encoder = new TextEncoder();
       const data = encoder.encode(dataToHash);
       const hashBuffer = await crypto.subtle.digest('SHA-256', data);
@@ -99,6 +105,7 @@ export const useGameLogic = (isSdkReady: boolean) => {
       tileIdCounterRef.current = newCounter;
       
       // 5. Set the final state for the new game.
+      setRandomness(newRandomness);
       setSeed(newSeed);
       setStartTime(newStartTime);
       setPrng(newPrng);
@@ -171,6 +178,7 @@ export const useGameLogic = (isSdkReady: boolean) => {
             setSeed(savedState.seed);
             setStartTime(savedState.startTime);
             setMoves(savedState.moves);
+            setRandomness(savedState.randomness || null);
             
             // Re-create the PRNG and fast-forward it to the correct state
             const loadedPrng = new SeededRandom(savedState.seed);
@@ -215,10 +223,11 @@ export const useGameLogic = (isSdkReady: boolean) => {
         seed,
         startTime,
         moves,
+        randomness,
       };
       localStorage.setItem(GAME_STATE_KEY, JSON.stringify(gameState));
     }
-  }, [tiles, score, isGameOver, isWon, isInitializing, seed, startTime, moves]);
+  }, [tiles, score, isGameOver, isWon, isInitializing, seed, startTime, moves, randomness]);
 
   useEffect(() => {
     if (score > bestScore) {
@@ -231,8 +240,48 @@ export const useGameLogic = (isSdkReady: boolean) => {
   const submitScore = useCallback(async () => {
     if (hasSubmittedScore || isSubmitting) return;
     setIsSubmitting(true);
-    // Here you would eventually send the seed, moves, startTime etc. to the contract
-    // For now, it just submits the score to the backend leaderboard.
+    
+    if (activeSeason === 'monad-s0') {
+      try {
+        console.log("Verifying MONAD S0 submission...");
+        if (!seed || !moves || !randomness || !userAddress || !startTime) {
+          throw new Error("Missing data for on-chain submission. Seed, moves, randomness, user address, or startTime is null.");
+        }
+
+        const verificationResult = verifyGame(seed, moves);
+        if (verificationResult.finalScore !== score) {
+            console.error("!!! VERIFICATION FAILED !!!");
+            console.error(`Client Score: ${score}, Verified Score: ${verificationResult.finalScore}`);
+            // In a real app, you would show an error to the user here.
+        } else {
+            console.log("Game verification successful!");
+        }
+
+        const packedMoves = packMoves(moves);
+        const packedBoard = packBoard(tiles); // Use current tiles state for final board
+        const endTime = Date.now();
+
+        console.log("--- MONAD S0 On-Chain Submission Data ---");
+        console.log(`Player Address: ${userAddress}`);
+        console.log(`Randomness (from Drand): ${randomness}`);
+        console.log(`Game Seed (SHA-256): ${seed}`);
+        console.log(`Packed Moves (hex): ${packedMoves}`);
+        console.log(`Packed Final Board (hex): ${packedBoard}`);
+        console.log(`Final Score: ${score}`);
+        console.log(`Start Time (ms): ${startTime}`);
+        console.log(`End Time (ms): ${endTime}`);
+        console.log("-----------------------------------------");
+        
+        setHasSubmittedScore(true); // Mark as "submitted" to update UI
+      } catch (error) {
+        console.error("Error during Monad S0 submission process:", error);
+      } finally {
+        setIsSubmitting(false);
+      }
+      return; // End execution for Monad season
+    }
+
+    // Original Farcaster leaderboard submission logic
     console.log(`Submitting score ${score} to backend...`);
     console.log('Game Data:', { seed, startTime, moves });
     
@@ -266,7 +315,7 @@ export const useGameLogic = (isSdkReady: boolean) => {
     } finally {
       setIsSubmitting(false);
     }
-  }, [score, hasSubmittedScore, isSubmitting, seed, startTime, moves]);
+  }, [score, hasSubmittedScore, isSubmitting, seed, startTime, moves, activeSeason, randomness, userAddress, tiles]);
 
   const performMove = useCallback((direction: 'up' | 'down' | 'left' | 'right') => {
     if (isGameOver || isMoving || !prng) return;

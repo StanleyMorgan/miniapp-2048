@@ -30,7 +30,7 @@ const App: React.FC = () => {
     userRank,
     isInitializing,
     userAddress
-  } = useGameLogic(isSdkReady);
+  } = useGameLogic(isSdkReady, activeSeason);
 
   const handleGlobalKeyDown = useCallback((event: KeyboardEvent) => {
     if (activeTab === 'game') {
