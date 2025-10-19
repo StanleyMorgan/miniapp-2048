@@ -46,7 +46,7 @@ const GameOver: React.FC<GameOverProps> = ({ onRestart, score, onSubmitScore, is
           {(!isNewBestScore || hasSubmittedScore) && (
             <button
               onClick={onRestart}
-              className="bg-slate-500 hover:bg-slate-600 text-white font-bold py-3 px-6 rounded-lg transition-colors duration-200 text-lg"
+              className="bg-slate-500 hover:bg-slate-600 text-white font-bold py-3 px-5 rounded-lg transition-colors duration-200 text-base whitespace-nowrap"
             >
               Try Again
             </button>
@@ -57,15 +57,15 @@ const GameOver: React.FC<GameOverProps> = ({ onRestart, score, onSubmitScore, is
             hasSubmittedScore ? (
               <button
                 onClick={handleShare}
-                className="bg-purple-600 hover:bg-purple-700 text-white font-bold py-3 px-6 rounded-lg transition-colors duration-200 text-lg"
+                className="bg-purple-600 hover:bg-purple-700 text-white font-bold py-3 px-5 rounded-lg transition-colors duration-200 text-base whitespace-nowrap"
               >
-                Share on Farcaster
+                Share
               </button>
             ) : (
               <button
                 onClick={onSubmitScore}
                 disabled={isSubmitting}
-                className="bg-orange-500 hover:bg-orange-600 text-white font-bold py-3 px-6 rounded-lg transition-colors duration-200 text-lg disabled:bg-orange-700 disabled:cursor-not-allowed"
+                className="bg-orange-500 hover:bg-orange-600 text-white font-bold py-3 px-5 rounded-lg transition-colors duration-200 text-base whitespace-nowrap disabled:bg-orange-700 disabled:cursor-not-allowed"
               >
                 {getButtonText()}
               </button>
