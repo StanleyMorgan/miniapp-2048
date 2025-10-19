@@ -41,21 +41,24 @@ export const useGameLogic = (isSdkReady: boolean) => {
   const newGame = useCallback(async () => {
     // Prevent multiple new games from starting concurrently.
     if (newGameLoadingRef.current) {
+      console.log(`[GAME #${gameIdRef.current}] New game request ignored, another one is already in progress.`);
       return;
     }
     
     // Increment game ID to invalidate stale async operations from the previous game.
     gameIdRef.current++;
+    const currentGameId = gameIdRef.current;
+    console.log(`[GAME #${currentGameId}] Starting new game...`);
     
     // Cancel any pending animation timeout from the previous move.
     if (moveTimeoutRef.current) {
+      console.log(`[GAME #${currentGameId}] Clearing pending animation timeout.`);
       clearTimeout(moveTimeoutRef.current);
       moveTimeoutRef.current = null;
     }
 
     // Immediately and synchronously reset the entire game state.
-    // This provides a clean slate and prevents "ghost" tiles from persisting
-    // during the async operations below. It also helps invalidate stale closures.
+    console.log(`[GAME #${currentGameId}] Performing synchronous state reset.`);
     setTiles([]);
     setScore(0);
     setIsGameOver(false);
@@ -72,12 +75,14 @@ export const useGameLogic = (isSdkReady: boolean) => {
     setIsMoving(true); // Blocks new moves while game is being created.
     
     try {
+      console.log(`[GAME #${currentGameId}] Fetching game session data...`);
       // 1. Fetch randomness and server time for seed generation
       const response = await fetch('/api/start-game');
       if (!response.ok) {
-        throw new Error('Failed to start a new game session.');
+        throw new Error(`Failed to start a new game session. Status: ${response.status}`);
       }
       const { randomness, startTime: newStartTime } = await response.json();
+      console.log(`[GAME #${currentGameId}] Session data received.`);
 
       // 2. Create the deterministic seed
       const dataToHash = `${randomness}${userAddress ?? ''}${newStartTime}`;
@@ -86,33 +91,38 @@ export const useGameLogic = (isSdkReady: boolean) => {
       const hashBuffer = await crypto.subtle.digest('SHA-256', data);
       const hashArray = Array.from(new Uint8Array(hashBuffer));
       const newSeed = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
-      
-      console.log("--- NEW GAME INITIALIZED ---");
-      console.log("Drand Randomness:", randomness);
-      console.log("Player Address:", userAddress);
-      console.log("Start Time:", newStartTime);
-      console.log("Generated Seed:", newSeed);
-      console.log("--------------------------");
+      console.log(`[GAME #${currentGameId}] Generated Seed: ${newSeed}`);
 
       // 3. Initialize PRNG with the new seed
       const newPrng = new SeededRandom(newSeed);
 
       // 4. Generate initial tiles using the PRNG and reset the tile ID counter
+      console.log(`[GAME #${currentGameId}] Generating initial tiles...`);
       const { initialTiles, newCounter } = generateInitialTiles(newPrng);
+      console.log(`[GAME #${currentGameId}] Initial tiles generated:`, JSON.stringify(initialTiles));
+      
+      // Sanity check for generated tiles.
+      if (!Array.isArray(initialTiles) || initialTiles.some(t => typeof t !== 'object' || t === null)) {
+        console.error(`[GAME #${currentGameId}] FATAL: generateInitialTiles returned invalid data.`, initialTiles);
+        throw new Error("Invalid initial tiles generated.");
+      }
+      
       tileIdCounterRef.current = newCounter;
       
       // 5. Set the final state for the new game.
+      console.log(`[GAME #${currentGameId}] Setting final React state for new game.`);
       setSeed(newSeed);
       setStartTime(newStartTime);
       setPrng(newPrng);
       setMoves([]); // Redundant, but safe.
       setTiles(initialTiles);
-      // Score, gameOver etc. are already reset from the sync part above.
+      console.log(`[GAME #${currentGameId}] New game setup complete.`);
 
     } catch (error) {
-      console.error("Error starting new game:", error);
+      console.error(`[GAME #${currentGameId}] Error starting new game:`, error);
       // Handle error, maybe show a toast to the user
     } finally {
+      console.log(`[GAME #${currentGameId}] Cleaning up locks.`);
       setIsMoving(false);
       newGameLoadingRef.current = false;
     }

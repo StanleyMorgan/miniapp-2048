@@ -36,7 +36,21 @@ export class SeededRandom {
 
 const tilesToGrid = (tiles: TileData[]): Grid => {
   const grid: Grid = Array(GRID_SIZE).fill(null).map(() => Array(GRID_SIZE).fill(null));
-  tiles.forEach(tile => {
+  
+  // Defensive check to find the root cause of the error.
+  if (!Array.isArray(tiles)) {
+    console.error('[tilesToGrid] FATAL: input `tiles` is not an array. Received:', tiles);
+    // Returning an empty grid to prevent a hard crash.
+    return grid;
+  }
+
+  tiles.forEach((tile, index) => {
+    if (!tile || typeof tile.row === 'undefined' || typeof tile.col === 'undefined') {
+        console.error(`[tilesToGrid] FATAL: Invalid tile object found at index ${index}. Tile data:`, JSON.stringify(tile), 'Full tiles array:', JSON.stringify(tiles));
+        // Skip this invalid tile to prevent a crash.
+        return;
+    }
+
     if (grid[tile.row] && grid[tile.row][tile.col] === null) {
       grid[tile.row][tile.col] = tile.value;
     }
@@ -87,14 +101,17 @@ export const addRandomTile = (tiles: TileData[], prng: SeededRandom, tileIdCount
  * @returns An object containing the array of initial tiles and the next available tile ID.
  */
 export const generateInitialTiles = (prng: SeededRandom): { initialTiles: TileData[], newCounter: number } => {
+  console.log('[generateInitialTiles] Starting generation.');
   let tileIdCounter = 1;
   let initialTiles: TileData[] = [];
   
   const res1 = addRandomTile(initialTiles, prng, tileIdCounter);
   initialTiles = res1.newTiles;
   tileIdCounter = res1.newCounter;
+  console.log('[generateInitialTiles] After first tile:', JSON.stringify(initialTiles));
 
   const res2 = addRandomTile(initialTiles, prng, tileIdCounter);
+  console.log('[generateInitialTiles] After second tile:', JSON.stringify(res2.newTiles));
 
   return { initialTiles: res2.newTiles, newCounter: res2.newCounter };
 };
