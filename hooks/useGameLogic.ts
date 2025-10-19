@@ -41,6 +41,8 @@ export const useGameLogic = (isSdkReady: boolean, activeSeason: Season) => {
   const gameIdRef = useRef(0);
   const newGameLoadingRef = useRef(false);
   const userAddressRef = useRef(userAddress);
+  const seasonTransitionRef = useRef(false); // Ref to prevent saving during season transitions
+
   useEffect(() => {
     userAddressRef.current = userAddress;
   }, [userAddress]);
@@ -171,16 +173,16 @@ export const useGameLogic = (isSdkReady: boolean, activeSeason: Season) => {
     }
 
     console.log(`[MainEffect] START for season: ${activeSeason}`);
+    seasonTransitionRef.current = true; // Set flag to block saving during transition
     
     // STEP 1: Immediately set initializing flag and synchronously clear the board state.
-    // This is the CRITICAL FIX to prevent the previous season's state from "bleeding"
+    // This is a CRITICAL FIX to prevent the previous season's state from "bleeding"
     // into the new season and being incorrectly saved by the save effect.
     setIsInitializing(true);
     setTiles([]);
     setScore(0);
     setIsGameOver(false);
     setIsWon(false);
-    // Keep other state like best scores, as they are not season-specific game states.
 
     const initializeGameForSeason = async () => {
       // Fetch user data and best scores. This can happen while we prepare the game board.
@@ -255,7 +257,14 @@ export const useGameLogic = (isSdkReady: boolean, activeSeason: Season) => {
 
       // STEP 4: All loading and setup is complete.
       setIsInitializing(false);
-      console.log(`[MainEffect] FINISH for season: ${activeSeason}. Final score: ${score}`);
+      console.log(`[MainEffect] FINISH for season: ${activeSeason}.`);
+      
+      // Schedule the ref reset to happen after this render cycle completes,
+      // ensuring the save effect for the new state runs correctly on the next update.
+      setTimeout(() => {
+        console.log(`[MainEffect] Resetting season transition flag for ${activeSeason}.`);
+        seasonTransitionRef.current = false;
+      }, 0);
     };
 
     initializeGameForSeason();
@@ -263,6 +272,12 @@ export const useGameLogic = (isSdkReady: boolean, activeSeason: Season) => {
   
   // Game state saving effect
   useEffect(() => {
+    // CRITICAL FIX: Do not save while a season transition is in progress.
+    if (seasonTransitionRef.current) {
+      console.log(`[SaveEffect] SKIPPING save for ${activeSeason} during season transition.`);
+      return;
+    }
+
     const shouldSave = !isInitializing && tiles.length > 0 && seed;
     console.log(`[SaveEffect] Check. season=${activeSeason}, isInitializing=${isInitializing}, shouldSave=${shouldSave}`);
 
