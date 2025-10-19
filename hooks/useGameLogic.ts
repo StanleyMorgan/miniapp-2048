@@ -36,6 +36,12 @@ export const useGameLogic = (isSdkReady: boolean) => {
   const [prng, setPrng] = useState<SeededRandom | null>(null);
 
   const newGame = useCallback(async () => {
+    // Prevent multiple new games from starting concurrently. `isMoving` is used
+    // as the loading state for new game creation.
+    if (isMoving) {
+      return;
+    }
+    
     // Increment the game ID to invalidate any pending operations from the previous game.
     gameIdRef.current++;
     
@@ -98,7 +104,7 @@ export const useGameLogic = (isSdkReady: boolean) => {
     } finally {
       setIsMoving(false);
     }
-  }, [userAddress]);
+  }, [userAddress, isMoving]);
 
   useEffect(() => {
     if (!isSdkReady) return;
