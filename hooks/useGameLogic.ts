@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { sdk } from '@farcaster/miniapp-sdk';
+import { useAccount, useConnect, useWriteContract, useWaitForTransactionReceipt } from 'wagmi';
 import type { TileData } from '../types';
 import {
   generateInitialTiles,
@@ -12,6 +13,22 @@ import {
   hexToUint8Array,
 } from '../utils/gridUtils';
 import { Season } from '../components/SeasonSelector';
+
+// --- MONAD S0 CONTRACT DETAILS ---
+// The contract address is now loaded from a Vite environment variable.
+// Create a .env.local file in your project root and add:
+// VITE_MONAD_CONTRACT_ADDRESS=0xYourContractAddressHere
+// @FIX: Cast `import.meta` to `any` to avoid TypeScript error when accessing `env`.
+const MONAD_LEADERBOARD_ADDRESS = (import.meta as any).env.VITE_MONAD_CONTRACT_ADDRESS as `0x${string}`;
+
+const MONAD_LEADERBOARD_ABI = [
+  {"inputs":[{"internalType":"address","name":"player","type":"address"},{"internalType":"uint64","name":"score","type":"uint64"}],"name":"GameSubmitted","type":"event","anonymous":false},
+  {"inputs":[],"name":"getLeaderboard","outputs":[{"components":[{"internalType":"address","name":"player","type":"address"},{"internalType":"uint64","name":"score","type":"uint64"}],"internalType":"struct GameLeaderboard.Leader[]","name":"","type":"tuple[]"}],"stateMutability":"view","type":"function"},
+  {"inputs":[{"internalType":"uint256","name":"","type":"uint256"}],"name":"leaderboard","outputs":[{"internalType":"address","name":"player","type":"address"},{"internalType":"uint64","name":"score","type":"uint64"}],"stateMutability":"view","type":"function"},
+  {"inputs":[{"internalType":"address","name":"","type":"address"}],"name":"results","outputs":[{"internalType":"uint128","name":"packedBoard","type":"uint128"},{"internalType":"uint64","name":"score","type":"uint64"},{"internalType":"uint64","name":"startTime","type":"uint64"},{"internalType":"uint64","name":"endTime","type":"uint64"},{"internalType":"bytes32","name":"seed","type":"bytes32"},{"internalType":"bytes32","name":"randomness","type":"bytes32"},{"internalType":"bytes32","name":"movesHash","type":"bytes32"}],"stateMutability":"view","type":"function"},
+  {"inputs":[{"internalType":"uint128","name":"packedBoard","type":"uint128"},{"internalType":"uint64","name":"score","type":"uint64"},{"internalType":"uint64","name":"startTime","type":"uint64"},{"internalType":"uint64","name":"endTime","type":"uint64"},{"internalType":"bytes32","name":"seed","type":"bytes32"},{"internalType":"bytes32","name":"randomness","type":"bytes32"},{"internalType":"bytes32","name":"movesHash","type":"bytes32"}],"name":"submitGame","outputs":[],"stateMutability":"external","type":"function"}
+];
+// --- END OF CONTRACT DETAILS ---
 
 const BEST_SCORE_KEY = 'bestScore2048';
 const GAME_STATE_KEY = 'gameState2048';
@@ -31,42 +48,58 @@ export const useGameLogic = (isSdkReady: boolean, activeSeason: Season) => {
   const [isMoving, setIsMoving] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [hasSubmittedScore, setHasSubmittedScore] = useState(false);
+  const [submissionStatus, setSubmissionStatus] = useState('');
   
-  const tileIdCounterRef = useRef(1); // Manages unique tile IDs safely within the hook.
+  const tileIdCounterRef = useRef(1);
   const moveTimeoutRef = useRef<number | null>(null);
-  const gameIdRef = useRef(0); // Used to invalidate stale async operations
-  const newGameLoadingRef = useRef(false); // Used to prevent concurrent new game starts
+  const gameIdRef = useRef(0);
+  const newGameLoadingRef = useRef(false);
 
-  // State for deterministic gameplay, as per the new architecture
   const [randomness, setRandomness] = useState<string | null>(null);
   const [seed, setSeed] = useState<string | null>(null);
   const [startTime, setStartTime] = useState<number | null>(null);
-  const [moves, setMoves] = useState<number[]>([]); // Keep for local replay/debug, but don't submit
+  const [moves, setMoves] = useState<number[]>([]);
   const [finalMovesHash, setFinalMovesHash] = useState<string>(INITIAL_MOVES_HASH);
   const [prng, setPrng] = useState<SeededRandom | null>(null);
 
-  const newGame = useCallback(async () => {
-    // Prevent multiple new games from starting concurrently.
-    if (newGameLoadingRef.current) {
-      return;
+  // --- WAGMI HOOKS FOR ON-CHAIN INTERACTION ---
+  // @FIX: Destructure `chain` from `useAccount` to use for the `writeContract` call.
+  const { address: wagmiAddress, isConnected, chain } = useAccount();
+  const { connect, connectors } = useConnect();
+  const { data: hash, writeContract, isPending, error: writeContractError } = useWriteContract();
+  const { isLoading: isConfirming, isSuccess: isConfirmed, error: txReceiptError } = useWaitForTransactionReceipt({ hash });
+  
+  // Effect to manage submission status based on wagmi state changes
+  useEffect(() => {
+    if (isPending) {
+      setSubmissionStatus('Confirm in your wallet...');
+    } else if (isConfirming) {
+      setSubmissionStatus('Submitting on-chain...');
+    } else if (isConfirmed) {
+      setSubmissionStatus('Success! Score submitted on-chain.');
+      setHasSubmittedScore(true);
+      setIsSubmitting(false);
+    } else if (writeContractError || txReceiptError) {
+      const error = writeContractError || txReceiptError;
+      const message = (error as any)?.shortMessage || error?.message || 'Transaction failed.';
+      setSubmissionStatus(message);
+      setIsSubmitting(false);
     }
-    
-    gameIdRef.current++;
-    const currentGameId = gameIdRef.current;
-    
-    // Cancel any pending animation timeout from the previous move.
-    if (moveTimeoutRef.current) {
-      clearTimeout(moveTimeoutRef.current);
-      moveTimeoutRef.current = null;
-    }
+  }, [isPending, isConfirming, isConfirmed, writeContractError, txReceiptError]);
 
-    // Immediately and synchronously reset the entire game state.
+
+  const newGame = useCallback(async () => {
+    if (newGameLoadingRef.current) return;
+    gameIdRef.current++;
+    if (moveTimeoutRef.current) clearTimeout(moveTimeoutRef.current);
+
     setTiles([]);
     setScore(0);
     setIsGameOver(false);
     setIsWon(false);
     setHasSubmittedScore(false);
     setIsSubmitting(false);
+    setSubmissionStatus('');
     setUserRank(null);
     setMoves([]);
     setSeed(null);
@@ -74,19 +107,14 @@ export const useGameLogic = (isSdkReady: boolean, activeSeason: Season) => {
     setRandomness(null);
     setFinalMovesHash(INITIAL_MOVES_HASH);
     
-    // Set loading locks.
     newGameLoadingRef.current = true;
-    setIsMoving(true); // Blocks new moves while game is being created.
+    setIsMoving(true);
     
     try {
-      // 1. Fetch randomness and server time for seed generation
       const response = await fetch('/api/start-game');
-      if (!response.ok) {
-        throw new Error(`Failed to start a new game session. Status: ${response.status}`);
-      }
+      if (!response.ok) throw new Error(`Failed to start a new game session. Status: ${response.status}`);
       const { randomness: newRandomness, startTime: newStartTime } = await response.json();
 
-      // 2. Create the deterministic seed
       const dataToHash = `${newRandomness}${userAddress ?? ''}${newStartTime}`;
       const encoder = new TextEncoder();
       const data = encoder.encode(dataToHash);
@@ -94,31 +122,23 @@ export const useGameLogic = (isSdkReady: boolean, activeSeason: Season) => {
       const hashArray = Array.from(new Uint8Array(hashBuffer));
       const newSeed = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
 
-      // 3. Initialize PRNG with the new seed
       const newPrng = new SeededRandom(newSeed);
-
-      // 4. Generate initial tiles using the PRNG and reset the tile ID counter
       const { initialTiles, newCounter } = generateInitialTiles(newPrng);
       
       if (!Array.isArray(initialTiles) || initialTiles.some(t => typeof t !== 'object' || t === null)) {
-        console.error(`[GAME #${currentGameId}] FATAL: generateInitialTiles returned invalid data.`, initialTiles);
         throw new Error("Invalid initial tiles generated.");
       }
       
       tileIdCounterRef.current = newCounter;
       
-      // 5. Set the final state for the new game.
       setRandomness(newRandomness);
       setSeed(newSeed);
       setStartTime(newStartTime);
       setPrng(newPrng);
-      setMoves([]); // Redundant, but safe.
-      setFinalMovesHash(INITIAL_MOVES_HASH); // Redundant, but safe
       setTiles(initialTiles);
 
     } catch (error) {
-      console.error(`[GAME #${currentGameId}] Error starting new game:`, error);
-      // Handle error, maybe show a toast to the user
+      console.error(`Error starting new game:`, error);
     } finally {
       setIsMoving(false);
       newGameLoadingRef.current = false;
@@ -127,19 +147,15 @@ export const useGameLogic = (isSdkReady: boolean, activeSeason: Season) => {
 
   useEffect(() => {
     if (!isSdkReady) return;
-
     const initializeGame = async () => {
       setIsInitializing(true);
-      
       try {
         const res = await sdk.quickAuth.fetch('/api/user-info');
         if (res.ok) {
           const data = await res.json();
           setUserAddress(data.primaryAddress || null);
         }
-      } catch (error) {
-        console.error('Error fetching user info:', error);
-      }
+      } catch (error) { console.error('Error fetching user info:', error); }
 
       const localBest = parseInt(localStorage.getItem(BEST_SCORE_KEY) || '0', 10);
       let finalBestScore = localBest;
@@ -154,27 +170,21 @@ export const useGameLogic = (isSdkReady: boolean, activeSeason: Season) => {
               if (currentUserEntry) {
                 setServerBestScore(currentUserEntry.score || 0);
                 finalBestScore = Math.max(localBest, currentUserEntry.score || 0);
-              } else {
-                setServerBestScore(0);
-              }
+              } else { setServerBestScore(0); }
             }
           }
       } catch (error) {
         console.error('Error fetching server best score:', error);
         setServerBestScore(null);
       }
-
       setBestScore(finalBestScore);
-      if (finalBestScore > localBest) {
-        localStorage.setItem(BEST_SCORE_KEY, finalBestScore.toString());
-      }
+      if (finalBestScore > localBest) localStorage.setItem(BEST_SCORE_KEY, finalBestScore.toString());
       
       const savedStateJSON = localStorage.getItem(GAME_STATE_KEY);
       let loadedFromSave = false;
       if (savedStateJSON) {
         try {
           const savedState = JSON.parse(savedStateJSON);
-          // A valid, verifiable game state must have randomness and the moves hash.
           if (savedState.randomness && savedState.finalMovesHash) {
             setTiles(savedState.tiles);
             setScore(savedState.score);
@@ -186,25 +196,16 @@ export const useGameLogic = (isSdkReady: boolean, activeSeason: Season) => {
             setRandomness(savedState.randomness);
             setFinalMovesHash(savedState.finalMovesHash);
             
-            // Re-create the PRNG and fast-forward it to the correct state
             const loadedPrng = new SeededRandom(savedState.seed);
-            // Each new tile generation consumes 2 random numbers (position and value)
-            // Initial generation is 2 tiles = 4 calls. Each subsequent move is 1 tile = 2 calls.
             const prngCalls = 4 + (savedState.moves.length * 2);
-            for (let i = 0; i < prngCalls; i++) {
-              loadedPrng.next();
-            }
+            for (let i = 0; i < prngCalls; i++) loadedPrng.next();
             setPrng(loadedPrng);
 
-            // Restore the tile ID counter to the next available ID
             const maxId = savedState.tiles.reduce((max: number, t: TileData) => Math.max(max, t.id), 0);
             tileIdCounterRef.current = maxId + 1;
-
             loadedFromSave = true;
           } else {
-            // If the state is from an older version (e.g., missing randomness or hash),
-            // it's not verifiable. We must start a new game.
-            console.warn("Saved game state is from an older version or is invalid. Starting a new game.");
+            console.warn("Saved game state is invalid. Starting a new game.");
             localStorage.removeItem(GAME_STATE_KEY);
           }
         } catch (e) {
@@ -212,31 +213,15 @@ export const useGameLogic = (isSdkReady: boolean, activeSeason: Season) => {
           localStorage.removeItem(GAME_STATE_KEY);
         }
       }
-
-      if (!loadedFromSave) {
-        await newGame();
-      }
-
+      if (!loadedFromSave) await newGame();
       setIsInitializing(false);
     };
-
     initializeGame();
   }, [isSdkReady, newGame]);
   
   useEffect(() => {
-    // Do not save state if there's no seed yet (e.g., during the initial reset in newGame)
     if (!isInitializing && tiles.length > 0 && seed) {
-      const gameState = {
-        tiles,
-        score,
-        isGameOver,
-        isWon,
-        seed,
-        startTime,
-        moves,
-        randomness,
-        finalMovesHash,
-      };
+      const gameState = { tiles, score, isGameOver, isWon, seed, startTime, moves, randomness, finalMovesHash };
       localStorage.setItem(GAME_STATE_KEY, JSON.stringify(gameState));
     }
   }, [tiles, score, isGameOver, isWon, isInitializing, seed, startTime, moves, randomness, finalMovesHash]);
@@ -255,40 +240,63 @@ export const useGameLogic = (isSdkReady: boolean, activeSeason: Season) => {
     
     if (activeSeason === 'monad-s0') {
       try {
-        console.log("Preparing MONAD S0 on-chain data...");
-
-        if (!seed || !randomness || !userAddress || !startTime || !finalMovesHash) {
-          throw new Error("Missing data for on-chain submission. Seed, randomness, user address, startTime, or finalMovesHash is null.");
+        if (!MONAD_LEADERBOARD_ADDRESS || MONAD_LEADERBOARD_ADDRESS.startsWith('0xYour')) {
+          throw new Error("Contract address is not configured. Set VITE_MONAD_CONTRACT_ADDRESS in your .env file.");
         }
-        
+        if (!seed || !randomness || !userAddress || !startTime || !finalMovesHash) {
+          throw new Error("Missing critical game data for on-chain submission.");
+        }
+
+        if (!isConnected) {
+          setSubmissionStatus('Connecting wallet...');
+          connect({ connector: connectors[0] });
+          // The submission will be re-triggered by the user after connecting.
+          // Or we could use an effect to watch for `isConnected` to become true.
+          // For now, let the user re-click.
+          setIsSubmitting(false); // Allow re-click after connection.
+          return;
+        }
+
+        if (wagmiAddress?.toLowerCase() !== userAddress.toLowerCase()) {
+           throw new Error(`Wallet mismatch. Please connect with ${userAddress.slice(0,6)}...${userAddress.slice(-4)}`);
+        }
+
+        // @FIX: Add a check to ensure the user is on the correct chain.
+        if (!chain) {
+          throw new Error('Please switch to the Monad network in your wallet.');
+        }
+
         const packedBoard = packBoard(tiles);
         const endTime = Date.now();
+        const args = [
+            BigInt(packedBoard), // uint128
+            BigInt(score), // uint64
+            BigInt(startTime), // uint64
+            BigInt(endTime), // uint64
+            '0x' + seed, // bytes32
+            randomness as `0x${string}`, // bytes32
+            finalMovesHash as `0x${string}` // bytes32
+        ];
 
-        console.log("--- MONAD S0 On-Chain Submission Data ---");
-        console.log(`Player Address (address): ${userAddress}`);
-        console.log(`Randomness (bytes32): ${randomness}`);
-        console.log(`Game Seed (bytes32): 0x${seed}`);
-        console.log(`Final Moves Hash (bytes32): ${finalMovesHash}`);
-        console.log(`Packed Final Board (uint128): ${packedBoard}`);
-        console.log(`Final Score (uint64): ${score}`);
-        console.log(`Start Time (uint64): ${startTime}`);
-        console.log(`End Time (uint64): ${endTime}`);
-        console.log("-----------------------------------------");
-        
-        // This is a simulation. In a real scenario, you would send this data to a smart contract.
-        setHasSubmittedScore(true);
-      } catch (error) {
-        console.error("Error during Monad S0 submission process:", error);
-      } finally {
+        // @FIX: Pass `account` and `chain` to the `writeContract` call to satisfy its type requirements.
+        writeContract({
+          address: MONAD_LEADERBOARD_ADDRESS,
+          abi: MONAD_LEADERBOARD_ABI,
+          functionName: 'submitGame',
+          args: args,
+          account: wagmiAddress,
+          chain: chain,
+        });
+
+      } catch (error: any) {
+        console.error("On-chain submission failed:", error);
+        setSubmissionStatus(error.message || 'An unknown error occurred.');
         setIsSubmitting(false);
       }
-      return; // End execution for Monad season
+      return;
     }
 
-    // Original Farcaster leaderboard submission logic
-    console.log(`Submitting score ${score} to backend...`);
-    console.log('Game Data:', { seed, startTime, moves });
-    
+    // --- Original Farcaster leaderboard submission logic ---
     try {
       const res = await sdk.quickAuth.fetch('/api/submit-score', {
         method: 'POST',
@@ -299,7 +307,6 @@ export const useGameLogic = (isSdkReady: boolean, activeSeason: Season) => {
       if (res.ok) {
         setHasSubmittedScore(true);
         setServerBestScore(prev => Math.max(prev ?? 0, score));
-        // Fetch rank after submission
         try {
           const authResult = await sdk.quickAuth.getToken();
           if ('token' in authResult) {
@@ -313,18 +320,18 @@ export const useGameLogic = (isSdkReady: boolean, activeSeason: Season) => {
         } catch (e) { console.error("Failed to fetch new rank", e); }
       } else {
         console.error('Failed to submit score:', await res.text());
+        setSubmissionStatus('Failed to save score.');
       }
     } catch (error) {
       console.error('Error during score submission:', error);
+      setSubmissionStatus('An error occurred.');
     } finally {
       setIsSubmitting(false);
     }
-  }, [score, hasSubmittedScore, isSubmitting, seed, startTime, moves, activeSeason, randomness, userAddress, tiles, finalMovesHash]);
+  }, [score, hasSubmittedScore, isSubmitting, activeSeason, tiles, seed, startTime, randomness, finalMovesHash, userAddress, isConnected, wagmiAddress, connect, connectors, writeContract, chain]);
 
   const performMove = useCallback(async (direction: 'up' | 'down' | 'left' | 'right') => {
     if (isGameOver || isMoving || !prng || !finalMovesHash) return;
-
-    // Capture the game ID at the start of the move to handle race conditions.
     const gameIdAtMoveStart = gameIdRef.current;
     const { newTiles, mergedTiles, scoreIncrease, hasMoved } = move(tiles, direction);
     
@@ -337,47 +344,29 @@ export const useGameLogic = (isSdkReady: boolean, activeSeason: Season) => {
         const newMove = directionMap[direction];
         setMoves(prevMoves => [...prevMoves, newMove]);
 
-        // Update the rolling hash
         try {
           const prevHashBytes = hexToUint8Array(finalMovesHash);
           const moveByte = new Uint8Array([newMove]);
           const dataToHash = new Uint8Array(prevHashBytes.length + moveByte.length);
           dataToHash.set(prevHashBytes);
           dataToHash.set(moveByte, prevHashBytes.length);
-          
           const newHash = await sha256(dataToHash);
           setFinalMovesHash(newHash);
         } catch (error) {
           console.error("Failed to update moves hash:", error);
-          // In a real app, you might want to show an error or invalidate the game state.
         }
 
         moveTimeoutRef.current = window.setTimeout(() => {
-          // Before updating state, check if a new game has started in the meantime.
-          // This prevents the animation callback from a previous game from corrupting
-          // the state of the current game.
-          if (gameIdRef.current !== gameIdAtMoveStart) {
-            return;
-          }
-
+          if (gameIdRef.current !== gameIdAtMoveStart) return;
           const tilesAfterAnimation = newTiles.map(t => ({ ...t, isMerged: false }));
           const { newTiles: finalTiles, newCounter } = addRandomTile(
-            tilesAfterAnimation, 
-            prng,
-            tileIdCounterRef.current
+            tilesAfterAnimation, prng, tileIdCounterRef.current
           );
           tileIdCounterRef.current = newCounter;
-          
           setTiles(finalTiles);
           setIsMoving(false);
-
-          if (!isWon && finalTiles.some(tile => tile.value === 2048)) {
-              setIsWon(true);
-          }
-  
-          if (checkIsGameOver(finalTiles)) {
-              setIsGameOver(true);
-          }
+          if (!isWon && finalTiles.some(tile => tile.value === 2048)) setIsWon(true);
+          if (checkIsGameOver(finalTiles)) setIsGameOver(true);
         }, ANIMATION_DURATION);
     }
   }, [tiles, isGameOver, isMoving, isWon, prng, finalMovesHash]);
@@ -395,5 +384,5 @@ export const useGameLogic = (isSdkReady: boolean, activeSeason: Season) => {
     performMove(direction);
   }, [performMove]);
 
-  return { tiles, score, bestScore, serverBestScore, isGameOver, isWon, newGame, handleKeyDown, performMove, submitScore, isSubmitting, hasSubmittedScore, userRank, isInitializing, userAddress };
+  return { tiles, score, bestScore, serverBestScore, isGameOver, isWon, newGame, handleKeyDown, performMove, submitScore, isSubmitting, hasSubmittedScore, userRank, isInitializing, userAddress, submissionStatus };
 };

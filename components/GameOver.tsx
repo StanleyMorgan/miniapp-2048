@@ -8,9 +8,10 @@ interface GameOverProps {
   hasSubmittedScore: boolean;
   isNewBestScore: boolean;
   userRank: number | null;
+  submissionStatus: string;
 }
 
-const GameOver: React.FC<GameOverProps> = ({ onRestart, score, onSubmitScore, isSubmitting, hasSubmittedScore, isNewBestScore, userRank }) => {
+const GameOver: React.FC<GameOverProps> = ({ onRestart, score, onSubmitScore, isSubmitting, hasSubmittedScore, isNewBestScore, userRank, submissionStatus }) => {
   
   const handleShare = () => {
     let text = `I just set a new high score of ${score} in the 2048 Mini App! Can you beat it?`;
@@ -27,40 +28,52 @@ const GameOver: React.FC<GameOverProps> = ({ onRestart, score, onSubmitScore, is
     window.open(shareUrl, '_blank');
   };
 
+  const getButtonText = () => {
+    if (isSubmitting) {
+      return submissionStatus || 'Saving...';
+    }
+    return 'Save Score';
+  }
+
   return (
-    <div className="absolute inset-0 bg-slate-800 bg-opacity-70 flex flex-col justify-center items-center rounded-lg animate-fade-in z-30">
-      <h2 className="text-5xl font-extrabold text-white mb-2">Game Over!</h2>
+    <div className="absolute inset-0 bg-slate-800 bg-opacity-70 flex flex-col justify-center items-center rounded-lg animate-fade-in z-30 p-4">
+      <h2 className="text-5xl font-extrabold text-white mb-2 text-center">Game Over!</h2>
       {isNewBestScore && <p className="text-xl text-orange-400 font-bold mb-1">New Best Score!</p>}
       <p className="text-lg text-slate-300 mb-6">Your score: {score}</p>
-      <div className="flex gap-4">
-        {/* Show "Try Again" if it's not a new best score, OR if the new score has already been submitted. */}
-        {(!isNewBestScore || hasSubmittedScore) && (
-          <button
-            onClick={onRestart}
-            className="bg-slate-500 hover:bg-slate-600 text-white font-bold py-3 px-6 rounded-lg transition-colors duration-200 text-lg"
-          >
-            Try Again
-          </button>
-        )}
-        
-        {/* Show "Save Score" or "Share" flow only when it's a new best score. */}
-        {isNewBestScore && (
-          hasSubmittedScore ? (
-             <button
-              onClick={handleShare}
-              className="bg-purple-600 hover:bg-purple-700 text-white font-bold py-3 px-6 rounded-lg transition-colors duration-200 text-lg"
-            >
-              Share on Farcaster
-            </button>
-          ) : (
+      <div className="flex flex-col items-center gap-4">
+        <div className="flex gap-4">
+          {/* Show "Try Again" if it's not a new best score, OR if the new score has already been submitted. */}
+          {(!isNewBestScore || hasSubmittedScore) && (
             <button
-              onClick={onSubmitScore}
-              disabled={isSubmitting}
-              className="bg-orange-500 hover:bg-orange-600 text-white font-bold py-3 px-6 rounded-lg transition-colors duration-200 text-lg disabled:bg-orange-700 disabled:cursor-not-allowed"
+              onClick={onRestart}
+              className="bg-slate-500 hover:bg-slate-600 text-white font-bold py-3 px-6 rounded-lg transition-colors duration-200 text-lg"
             >
-              {isSubmitting ? 'Saving...' : 'Save Score'}
+              Try Again
             </button>
-          )
+          )}
+          
+          {/* Show "Save Score" or "Share" flow only when it's a new best score. */}
+          {isNewBestScore && (
+            hasSubmittedScore ? (
+              <button
+                onClick={handleShare}
+                className="bg-purple-600 hover:bg-purple-700 text-white font-bold py-3 px-6 rounded-lg transition-colors duration-200 text-lg"
+              >
+                Share on Farcaster
+              </button>
+            ) : (
+              <button
+                onClick={onSubmitScore}
+                disabled={isSubmitting}
+                className="bg-orange-500 hover:bg-orange-600 text-white font-bold py-3 px-6 rounded-lg transition-colors duration-200 text-lg disabled:bg-orange-700 disabled:cursor-not-allowed"
+              >
+                {getButtonText()}
+              </button>
+            )
+          )}
+        </div>
+        {isSubmitting && submissionStatus && (
+          <p className="text-sm text-slate-300 mt-2 text-center">{submissionStatus}</p>
         )}
       </div>
     </div>

@@ -29,7 +29,8 @@ const App: React.FC = () => {
     hasSubmittedScore,
     userRank,
     isInitializing,
-    userAddress
+    userAddress,
+    submissionStatus
   } = useGameLogic(isSdkReady, activeSeason);
 
   const handleGlobalKeyDown = useCallback((event: KeyboardEvent) => {
@@ -132,6 +133,7 @@ const App: React.FC = () => {
               hasSubmittedScore={hasSubmittedScore}
               isNewBestScore={shouldShowSaveFlow}
               userRank={userRank}
+              submissionStatus={submissionStatus}
             />
           )}
         </div>
