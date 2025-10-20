@@ -1,7 +1,8 @@
 
+
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { sdk } from '@farcaster/miniapp-sdk';
-import { useAccount, useConnect, useWriteContract, useWaitForTransactionReceipt, useReadContract } from 'wagmi';
+import { useAccount, useConnect, useWriteContract, useWaitForTransactionReceipt, useReadContract, useSwitchChain } from 'wagmi';
 import type { TileData } from '../types';
 import {
   generateInitialTiles,
@@ -96,6 +97,7 @@ export const useGameLogic = (isSdkReady: boolean, activeSeason: Season) => {
   // --- WAGMI HOOKS FOR ON-CHAIN INTERACTION ---
   const { address: wagmiAddress, isConnected, chain } = useAccount();
   const { connect, connectors } = useConnect();
+  const { switchChain } = useSwitchChain();
   const { data: hash, writeContract, isPending, error: writeContractError } = useWriteContract();
   const { isLoading: isConfirming, isSuccess: isConfirmed, error: txReceiptError } = useWaitForTransactionReceipt({ hash });
   
@@ -362,7 +364,19 @@ export const useGameLogic = (isSdkReady: boolean, activeSeason: Season) => {
         }
 
         if (chain?.id !== activeSeasonConfig.chainId) {
-          throw new Error(`Please switch to the ${activeSeasonConfig.chainName} network in your wallet.`);
+          setSubmissionStatus(`Switching to ${activeSeasonConfig.chainName}...`);
+          switchChain({ chainId: activeSeasonConfig.chainId }, {
+            onSuccess: () => {
+              setSubmissionStatus(`Network switched. Please "Save Score" again.`);
+              setIsSubmitting(false);
+            },
+            onError: (error) => {
+              console.error("Failed to switch network:", error);
+              setSubmissionStatus(`Please switch to ${activeSeasonConfig.chainName} in your wallet.`);
+              setIsSubmitting(false);
+            }
+          });
+          return;
         }
 
         const packedBoard = packBoard(tiles);
@@ -426,7 +440,7 @@ export const useGameLogic = (isSdkReady: boolean, activeSeason: Season) => {
     } finally {
       setIsSubmitting(false);
     }
-  }, [score, hasSubmittedScore, isSubmitting, activeSeasonConfig, tiles, seed, startTime, randomness, finalMovesHash, userAddress, isConnected, wagmiAddress, connect, connectors, writeContract, chain, activeSeason]);
+  }, [score, hasSubmittedScore, isSubmitting, activeSeasonConfig, tiles, seed, startTime, randomness, finalMovesHash, userAddress, isConnected, wagmiAddress, connect, connectors, writeContract, chain, activeSeason, switchChain]);
 
   const performMove = useCallback(async (direction: 'up' | 'down' | 'left' | 'right') => {
     if (isGameOver || isMoving || !prng || !finalMovesHash) return;
