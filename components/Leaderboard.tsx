@@ -1,12 +1,10 @@
 
+
 import React, { useState, useEffect } from 'react';
 import { sdk } from '@farcaster/miniapp-sdk';
 import { useReadContract, useAccount } from 'wagmi';
 import {
-    MONAD_LEADERBOARD_ADDRESS,
-    BASE_LEADERBOARD_ADDRESS,
-    CELO_LEADERBOARD_ADDRESS,
-    LEADERBOARD_ABI
+    onChainSeasonConfigs
 } from '../constants/contract';
 import { Season } from './SeasonSelector';
 
@@ -21,13 +19,6 @@ type LeaderboardEntry = {
   fid: number;
   score: number;
   isCurrentUser?: boolean;
-};
-
-// Map seasons to their on-chain configurations
-const onChainSeasonConfigs = {
-  'monad-s0': { address: MONAD_LEADERBOARD_ADDRESS, abi: LEADERBOARD_ABI },
-  'base-s0': { address: BASE_LEADERBOARD_ADDRESS, abi: LEADERBOARD_ABI },
-  'celo-s0': { address: CELO_LEADERBOARD_ADDRESS, abi: LEADERBOARD_ABI },
 };
 
 // Type guard to check if a season is an on-chain season
@@ -99,7 +90,7 @@ const Leaderboard: React.FC<LeaderboardProps> = ({ isReady, activeSeason }) => {
     if (!isReady) return;
 
     if (activeSeasonConfig) {
-      if (onChainLeaderboard) {
+      if (Array.isArray(onChainLeaderboard)) {
         const formattedData = (onChainLeaderboard as { player: string; score: bigint }[])
             .map((entry, index) => ({
                 rank: index + 1, // Placeholder rank
@@ -112,6 +103,8 @@ const Leaderboard: React.FC<LeaderboardProps> = ({ isReady, activeSeason }) => {
             .map((entry, index) => ({ ...entry, rank: index + 1 })); // Re-assign rank after sorting
         
         setLeaderboardData(formattedData);
+      } else {
+        setLeaderboardData([]);
       }
     } else {
       fetchFarcasterLeaderboard();

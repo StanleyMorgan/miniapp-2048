@@ -7,6 +7,8 @@ import GameOver from './components/GameOver';
 import Tabs from './components/Tabs';
 import Leaderboard from './components/Leaderboard';
 import SeasonSelector, { Season } from './components/SeasonSelector';
+import { useAccount, useSwitchChain } from 'wagmi';
+import { onChainSeasonConfigs } from './constants/contract';
 
 const App: React.FC = () => {
   console.log('App component mounting...');
@@ -15,6 +17,8 @@ const App: React.FC = () => {
   const [activeSeason, setActiveSeason] = useState<Season>('farcaster');
   const [isSdkReady, setIsSdkReady] = useState(false);
   const [shouldShowSaveFlow, setShouldShowSaveFlow] = useState(false);
+  const { isConnected, chain } = useAccount();
+  const { switchChain } = useSwitchChain();
 
   const { 
     tiles, 
@@ -39,6 +43,15 @@ const App: React.FC = () => {
       handleKeyDown(event);
     }
   }, [activeTab, handleKeyDown]);
+
+  // Effect to automatically switch network when an on-chain season is selected
+  useEffect(() => {
+    const seasonConfig = onChainSeasonConfigs[activeSeason];
+    if (isConnected && seasonConfig && chain?.id !== seasonConfig.chainId && switchChain) {
+      console.log(`Switching network from ${chain?.id} to ${seasonConfig.chainId} for season ${activeSeason}`);
+      switchChain({ chainId: seasonConfig.chainId });
+    }
+  }, [activeSeason, isConnected, chain, switchChain]);
 
   useEffect(() => {
     console.log('App useEffect for SDK initialization running.');

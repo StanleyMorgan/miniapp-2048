@@ -1,4 +1,5 @@
 
+
 // --- MONAD S0 CONTRACT DETAILS ---
 // The contract address is now loaded from a Vite environment variable.
 // Create a .env.local file in your project root and add:
@@ -22,6 +23,36 @@ export const LEADERBOARD_ABI = [
   {"inputs":[{"internalType":"address","name":"","type":"address"}],"name":"results","outputs":[{"internalType":"uint128","name":"packedBoard","type":"uint128"},{"internalType":"uint64","name":"score","type":"uint64"},{"internalType":"uint64","name":"startTime","type":"uint64"},{"internalType":"uint64","name":"endTime","type":"uint64"},{"internalType":"bytes32","name":"seed","type":"bytes32"},{"internalType":"bytes32","name":"randomness","type":"bytes32"},{"internalType":"bytes32","name":"movesHash","type":"bytes32"}],"stateMutability":"view","type":"function"},
   {"inputs":[{"internalType":"uint128","name":"packedBoard","type":"uint128"},{"internalType":"uint64","name":"score","type":"uint64"},{"internalType":"uint64","name":"startTime","type":"uint64"},{"internalType":"uint64","name":"endTime","type":"uint64"},{"internalType":"bytes32","name":"seed","type":"bytes32"},{"internalType":"bytes32","name":"randomness","type":"bytes32"},{"internalType":"bytes32","name":"movesHash","type":"bytes32"}],"name":"submitGame","outputs":[],"stateMutability":"nonpayable","type":"function"}
 ];
+
+// Helper type for on-chain season configuration
+export type OnChainSeasonConfig = {
+  address: `0x${string}`;
+  abi: any;
+  chainId: number;
+  chainName: string;
+};
+
+// Map seasons to their on-chain configurations
+export const onChainSeasonConfigs = {
+  'monad-s0': {
+    address: MONAD_LEADERBOARD_ADDRESS,
+    abi: LEADERBOARD_ABI,
+    chainId: 10143,
+    chainName: 'Monad Testnet',
+  },
+  'base-s0': {
+    address: BASE_LEADERBOARD_ADDRESS,
+    abi: LEADERBOARD_ABI,
+    chainId: 8453,
+    chainName: 'Base',
+  },
+  'celo-s0': {
+    address: CELO_LEADERBOARD_ADDRESS,
+    abi: LEADERBOARD_ABI,
+    chainId: 42220,
+    chainName: 'Celo',
+  },
+};
 
 // For backward compatibility where MONAD_LEADERBOARD_ABI is imported directly.
 export const MONAD_LEADERBOARD_ABI = LEADERBOARD_ABI;

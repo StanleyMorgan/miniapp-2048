@@ -16,46 +16,14 @@ import {
 } from '../utils/gridUtils';
 import { Season } from '../components/SeasonSelector';
 import { 
-    MONAD_LEADERBOARD_ADDRESS, 
-    BASE_LEADERBOARD_ADDRESS, 
-    CELO_LEADERBOARD_ADDRESS, 
-    LEADERBOARD_ABI
+    LEADERBOARD_ABI,
+    onChainSeasonConfigs
 } from '../constants/contract';
 
 
 const BEST_SCORE_KEY = 'bestScore2048';
 const ANIMATION_DURATION = 200;
 const INITIAL_MOVES_HASH = '0x' + '0'.repeat(64);
-
-// Helper type for on-chain season configuration
-type OnChainSeasonConfig = {
-  address: `0x${string}`;
-  abi: any; // ABI type from viem/abitype
-  chainId: number;
-  chainName: string;
-};
-
-// Map seasons to their on-chain configurations
-const onChainSeasonConfigs: Record<string, OnChainSeasonConfig> = {
-  'monad-s0': {
-    address: MONAD_LEADERBOARD_ADDRESS,
-    abi: LEADERBOARD_ABI,
-    chainId: 10143, // Monad Testnet
-    chainName: 'Monad Testnet',
-  },
-  'base-s0': {
-    address: BASE_LEADERBOARD_ADDRESS,
-    abi: LEADERBOARD_ABI,
-    chainId: 8453, // Base Mainnet
-    chainName: 'Base',
-  },
-  'celo-s0': {
-    address: CELO_LEADERBOARD_ADDRESS,
-    abi: LEADERBOARD_ABI,
-    chainId: 42220, // Celo Mainnet
-    chainName: 'Celo',
-  },
-};
 
 export const useGameLogic = (isSdkReady: boolean, activeSeason: Season) => {
   const [isInitializing, setIsInitializing] = useState(true);
@@ -92,7 +60,7 @@ export const useGameLogic = (isSdkReady: boolean, activeSeason: Season) => {
   const [prng, setPrng] = useState<SeededRandom | null>(null);
 
   // Get the config for the current season, if it's an on-chain one
-  const activeSeasonConfig = onChainSeasonConfigs[activeSeason];
+  const activeSeasonConfig = activeSeason in onChainSeasonConfigs ? onChainSeasonConfigs[activeSeason as keyof typeof onChainSeasonConfigs] : undefined;
 
   // --- WAGMI HOOKS FOR ON-CHAIN INTERACTION ---
   const { address: wagmiAddress, isConnected, chain } = useAccount();
