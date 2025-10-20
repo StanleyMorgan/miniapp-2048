@@ -1,7 +1,13 @@
+
 import React, { useState, useEffect } from 'react';
 import { sdk } from '@farcaster/miniapp-sdk';
 import { useReadContract, useAccount } from 'wagmi';
-import { MONAD_LEADERBOARD_ADDRESS, MONAD_LEADERBOARD_ABI } from '../constants/contract';
+import {
+    MONAD_LEADERBOARD_ADDRESS,
+    BASE_LEADERBOARD_ADDRESS,
+    CELO_LEADERBOARD_ADDRESS,
+    LEADERBOARD_ABI
+} from '../constants/contract';
 import { Season } from './SeasonSelector';
 
 interface LeaderboardProps {
@@ -17,21 +23,36 @@ type LeaderboardEntry = {
   isCurrentUser?: boolean;
 };
 
+// Map seasons to their on-chain configurations
+const onChainSeasonConfigs = {
+  'monad-s0': { address: MONAD_LEADERBOARD_ADDRESS, abi: LEADERBOARD_ABI },
+  'base-s0': { address: BASE_LEADERBOARD_ADDRESS, abi: LEADERBOARD_ABI },
+  'celo-s0': { address: CELO_LEADERBOARD_ADDRESS, abi: LEADERBOARD_ABI },
+};
+
+// Type guard to check if a season is an on-chain season
+const isOnChainSeason = (season: Season): season is keyof typeof onChainSeasonConfigs => {
+  return onChainSeasonConfigs.hasOwnProperty(season);
+};
+
+
 const Leaderboard: React.FC<LeaderboardProps> = ({ isReady, activeSeason }) => {
   const [leaderboardData, setLeaderboardData] = useState<LeaderboardEntry[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const { address: userAddress } = useAccount();
 
+  const activeSeasonConfig = isOnChainSeason(activeSeason) ? onChainSeasonConfigs[activeSeason] : null;
+
   const { 
     data: onChainLeaderboard, 
     error: onChainError, 
     isLoading: isOnChainLoading 
   } = useReadContract({
-    address: MONAD_LEADERBOARD_ADDRESS,
-    abi: MONAD_LEADERBOARD_ABI,
+    address: activeSeasonConfig?.address,
+    abi: activeSeasonConfig?.abi,
     functionName: 'getLeaderboard',
-    query: { enabled: isReady && activeSeason === 'monad-s0' }
+    query: { enabled: isReady && !!activeSeasonConfig }
   });
 
   useEffect(() => {
@@ -77,27 +98,30 @@ const Leaderboard: React.FC<LeaderboardProps> = ({ isReady, activeSeason }) => {
     
     if (!isReady) return;
 
-    if (activeSeason === 'monad-s0') {
+    if (activeSeasonConfig) {
       if (onChainLeaderboard) {
-        const formattedData = (onChainLeaderboard as { player: string; score: bigint }[]).map((entry, index) => ({
-          rank: index + 1,
-          displayName: `${entry.player.slice(0, 6)}...${entry.player.slice(-4)}`,
-          fid: index + 1,
-          score: Number(entry.score),
-          isCurrentUser: !!userAddress && userAddress.toLowerCase() === entry.player.toLowerCase(),
-        }));
+        const formattedData = (onChainLeaderboard as { player: string; score: bigint }[])
+            .map((entry, index) => ({
+                rank: index + 1, // Placeholder rank
+                displayName: `${entry.player.slice(0, 6)}...${entry.player.slice(-4)}`,
+                fid: index + 1, // Not a real FID, just a unique key
+                score: Number(entry.score),
+                isCurrentUser: !!userAddress && userAddress.toLowerCase() === entry.player.toLowerCase(),
+            }))
+            .sort((a, b) => b.score - a.score) // Sort by score descending
+            .map((entry, index) => ({ ...entry, rank: index + 1 })); // Re-assign rank after sorting
+        
         setLeaderboardData(formattedData);
       }
     } else {
       fetchFarcasterLeaderboard();
     }
-  }, [isReady, activeSeason, onChainLeaderboard, userAddress]);
+  }, [isReady, activeSeason, activeSeasonConfig, onChainLeaderboard, userAddress]);
 
   const renderContent = () => {
-    const isMonadLoading = activeSeason === 'monad-s0' && isOnChainLoading;
-    const isMonadError = activeSeason === 'monad-s0' && onChainError;
-    const effectiveIsLoading = isLoading || isMonadLoading;
-    const effectiveError = error || (isMonadError ? 'Could not load on-chain leaderboard.' : null);
+    const isSeasonOnChain = !!activeSeasonConfig;
+    const effectiveIsLoading = isLoading || (isSeasonOnChain && isOnChainLoading);
+    const effectiveError = error || (isSeasonOnChain && onChainError ? 'Could not load on-chain leaderboard.' : null);
 
     if (effectiveIsLoading) {
       return (

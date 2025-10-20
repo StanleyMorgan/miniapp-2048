@@ -1,29 +1,53 @@
+
 import { http, createConfig } from 'wagmi';
-// @FIX: `defineChain` is exported from `viem`, not `wagmi`.
 import { defineChain } from 'viem';
 import { farcasterMiniApp } from '@farcaster/miniapp-wagmi-connector';
 
-// --- MONAD CHAIN DEFINITION ---
-// IMPORTANT: You must verify these details for the Monad network you are targeting.
-// The values below are plausible placeholders for a testnet or future mainnet.
-// Update the id, rpc URL, and explorer URL as needed.
+// --- CHAIN DEFINITIONS ---
+
 const monad = defineChain({
-  id: 10143, // Using Base chain ID as a placeholder. REPLACE with Monad's actual chain ID.
+  id: 10143,
   name: 'Monad Testnet',
   nativeCurrency: { name: 'MONAD', symbol: 'MON', decimals: 18 },
   rpcUrls: {
-    default: { http: ['https://monad-testnet.drpc.org'] }, // REPLACE with the correct RPC URL for Monad.
+    default: { http: ['https://monad-testnet.drpc.org'] },
   },
   blockExplorers: {
-    default: { name: 'MonadScan', url: 'https://monad-testnet.socialscan.io/' }, // REPLACE with the correct block explorer URL.
+    default: { name: 'MonadScan', url: 'https://monad-testnet.socialscan.io/' },
   },
 });
-// --- END OF CHAIN DEFINITION ---
+
+const base = defineChain({
+  id: 8453,
+  name: 'Base',
+  nativeCurrency: { name: 'Ether', symbol: 'ETH', decimals: 18 },
+  rpcUrls: {
+    default: { http: ['https://mainnet.base.org'] },
+  },
+  blockExplorers: {
+    default: { name: 'Basescan', url: 'https://basescan.org' },
+  },
+});
+
+const celo = defineChain({
+  id: 42220,
+  name: 'Celo',
+  nativeCurrency: { name: 'Celo', symbol: 'CELO', decimals: 18 },
+  rpcUrls: {
+    default: { http: ['https://forno.celo.org'] },
+  },
+  blockExplorers: {
+    default: { name: 'Celoscan', url: 'https://celoscan.io' },
+  },
+});
+// --- END OF CHAIN DEFINITIONS ---
 
 export const config = createConfig({
-  chains: [monad],
+  chains: [monad, base, celo],
   transports: {
     [monad.id]: http(),
+    [base.id]: http(),
+    [celo.id]: http(),
   },
   connectors: [
     farcasterMiniApp()

@@ -1,3 +1,4 @@
+
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { sdk } from '@farcaster/miniapp-sdk';
 import { useAccount, useConnect, useWriteContract, useWaitForTransactionReceipt, useReadContract } from 'wagmi';
@@ -13,12 +14,47 @@ import {
   hexToUint8Array,
 } from '../utils/gridUtils';
 import { Season } from '../components/SeasonSelector';
-import { MONAD_LEADERBOARD_ADDRESS, MONAD_LEADERBOARD_ABI } from '../constants/contract';
+import { 
+    MONAD_LEADERBOARD_ADDRESS, 
+    BASE_LEADERBOARD_ADDRESS, 
+    CELO_LEADERBOARD_ADDRESS, 
+    LEADERBOARD_ABI
+} from '../constants/contract';
 
 
 const BEST_SCORE_KEY = 'bestScore2048';
 const ANIMATION_DURATION = 200;
 const INITIAL_MOVES_HASH = '0x' + '0'.repeat(64);
+
+// Helper type for on-chain season configuration
+type OnChainSeasonConfig = {
+  address: `0x${string}`;
+  abi: any; // ABI type from viem/abitype
+  chainId: number;
+  chainName: string;
+};
+
+// Map seasons to their on-chain configurations
+const onChainSeasonConfigs: Record<string, OnChainSeasonConfig> = {
+  'monad-s0': {
+    address: MONAD_LEADERBOARD_ADDRESS,
+    abi: LEADERBOARD_ABI,
+    chainId: 10143, // Monad Testnet
+    chainName: 'Monad Testnet',
+  },
+  'base-s0': {
+    address: BASE_LEADERBOARD_ADDRESS,
+    abi: LEADERBOARD_ABI,
+    chainId: 8453, // Base Mainnet
+    chainName: 'Base',
+  },
+  'celo-s0': {
+    address: CELO_LEADERBOARD_ADDRESS,
+    abi: LEADERBOARD_ABI,
+    chainId: 42220, // Celo Mainnet
+    chainName: 'Celo',
+  },
+};
 
 export const useGameLogic = (isSdkReady: boolean, activeSeason: Season) => {
   const [isInitializing, setIsInitializing] = useState(true);
@@ -54,6 +90,9 @@ export const useGameLogic = (isSdkReady: boolean, activeSeason: Season) => {
   const [finalMovesHash, setFinalMovesHash] = useState<string>(INITIAL_MOVES_HASH);
   const [prng, setPrng] = useState<SeededRandom | null>(null);
 
+  // Get the config for the current season, if it's an on-chain one
+  const activeSeasonConfig = onChainSeasonConfigs[activeSeason];
+
   // --- WAGMI HOOKS FOR ON-CHAIN INTERACTION ---
   const { address: wagmiAddress, isConnected, chain } = useAccount();
   const { connect, connectors } = useConnect();
@@ -61,24 +100,24 @@ export const useGameLogic = (isSdkReady: boolean, activeSeason: Season) => {
   const { isLoading: isConfirming, isSuccess: isConfirmed, error: txReceiptError } = useWaitForTransactionReceipt({ hash });
   
   const { data: onChainResult } = useReadContract({
-    address: MONAD_LEADERBOARD_ADDRESS,
-    abi: MONAD_LEADERBOARD_ABI,
+    address: activeSeasonConfig?.address,
+    abi: activeSeasonConfig?.abi,
     functionName: 'results',
     args: [userAddress as `0x${string}`],
     query: {
-      enabled: isSdkReady && !!userAddress && activeSeason === 'monad-s0',
+      enabled: isSdkReady && !!userAddress && !!activeSeasonConfig,
     }
   });
 
   // Effect to switch the displayed server best score based on the active season
   useEffect(() => {
-    if (activeSeason === 'monad-s0') {
+    if (activeSeasonConfig) {
       const onChainScore = onChainResult?.[1]; // score is at index 1
       setServerBestScore(typeof onChainScore === 'bigint' ? Number(onChainScore) : 0);
     } else {
       setServerBestScore(farcasterBestScore);
     }
-  }, [activeSeason, onChainResult, farcasterBestScore]);
+  }, [activeSeason, onChainResult, farcasterBestScore, activeSeasonConfig]);
 
   // Effect to manage submission status based on wagmi state changes
   useEffect(() => {
@@ -301,10 +340,11 @@ export const useGameLogic = (isSdkReady: boolean, activeSeason: Season) => {
     if (hasSubmittedScore || isSubmitting) return;
     setIsSubmitting(true);
     
-    if (activeSeason === 'monad-s0') {
+    // Check if the current season is an on-chain season
+    if (activeSeasonConfig) {
       try {
-        if (!MONAD_LEADERBOARD_ADDRESS || MONAD_LEADERBOARD_ADDRESS.startsWith('0xYour')) {
-          throw new Error("Contract address is not configured. Set VITE_MONAD_CONTRACT_ADDRESS in your .env file.");
+        if (!activeSeasonConfig.address || activeSeasonConfig.address.startsWith('0xYour')) {
+          throw new Error(`Contract address is not configured for ${activeSeasonConfig.chainName}.`);
         }
         if (!seed || !randomness || !userAddress || !startTime || !finalMovesHash) {
           throw new Error("Missing critical game data for on-chain submission.");
@@ -321,8 +361,8 @@ export const useGameLogic = (isSdkReady: boolean, activeSeason: Season) => {
            throw new Error(`Wallet mismatch. Please connect with ${userAddress.slice(0,6)}...${userAddress.slice(-4)}`);
         }
 
-        if (!chain) {
-          throw new Error('Please switch to the Monad network in your wallet.');
+        if (chain?.id !== activeSeasonConfig.chainId) {
+          throw new Error(`Please switch to the ${activeSeasonConfig.chainName} network in your wallet.`);
         }
 
         const packedBoard = packBoard(tiles);
@@ -338,8 +378,8 @@ export const useGameLogic = (isSdkReady: boolean, activeSeason: Season) => {
         ];
 
         writeContract({
-          address: MONAD_LEADERBOARD_ADDRESS,
-          abi: MONAD_LEADERBOARD_ABI,
+          address: activeSeasonConfig.address,
+          abi: activeSeasonConfig.abi,
           functionName: 'submitGame',
           args: args,
           account: wagmiAddress,
@@ -386,7 +426,7 @@ export const useGameLogic = (isSdkReady: boolean, activeSeason: Season) => {
     } finally {
       setIsSubmitting(false);
     }
-  }, [score, hasSubmittedScore, isSubmitting, activeSeason, tiles, seed, startTime, randomness, finalMovesHash, userAddress, isConnected, wagmiAddress, connect, connectors, writeContract, chain]);
+  }, [score, hasSubmittedScore, isSubmitting, activeSeasonConfig, tiles, seed, startTime, randomness, finalMovesHash, userAddress, isConnected, wagmiAddress, connect, connectors, writeContract, chain, activeSeason]);
 
   const performMove = useCallback(async (direction: 'up' | 'down' | 'left' | 'right') => {
     if (isGameOver || isMoving || !prng || !finalMovesHash) return;
