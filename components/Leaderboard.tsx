@@ -30,21 +30,10 @@ const Leaderboard: React.FC<LeaderboardProps> = ({ isReady, activeSeason }) => {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const { address: userAddress, chainId, isConnected } = useAccount();
-  const [initialLoad, setInitialLoad] = useState(true);
-
-  // This effect runs only once on component mount to set the initial load flag to false after a delay.
-  // This is a workaround for a race condition on the Farcaster desktop client where the wallet/network
-  // info might not be immediately available on a full page reload.
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      setInitialLoad(false);
-    }, 500); // Wait 500ms before attempting to check network status
-    return () => clearTimeout(timer);
-  }, []);
 
   const activeSeasonConfig = isOnChainSeason(activeSeason) ? onChainSeasonConfigs[activeSeason] : null;
 
-  const isQueryEnabled = isReady && !!activeSeasonConfig && isConnected && chainId === activeSeasonConfig.chainId && !initialLoad;
+  const isQueryEnabled = isReady && !!activeSeasonConfig && isConnected && chainId === activeSeasonConfig.chainId;
 
   // New detailed log for query state, runs on every render for on-chain seasons
   useEffect(() => {
@@ -56,7 +45,6 @@ const Leaderboard: React.FC<LeaderboardProps> = ({ isReady, activeSeason }) => {
               currentChainId: chainId,
               expectedChainId: activeSeasonConfig?.chainId,
               isCorrectChain: chainId === activeSeasonConfig?.chainId,
-              initialLoadComplete: !initialLoad,
               isQueryEnabled: isQueryEnabled,
           });
       }
@@ -75,7 +63,6 @@ const Leaderboard: React.FC<LeaderboardProps> = ({ isReady, activeSeason }) => {
     functionName: 'getLeaderboard',
     query: { 
       // Only enable the query if the user is connected to the correct chain for the selected season.
-      // We also wait for the initialLoad delay to pass to avoid premature checks.
       enabled: isQueryEnabled,
     }
   });
@@ -172,8 +159,7 @@ const Leaderboard: React.FC<LeaderboardProps> = ({ isReady, activeSeason }) => {
     const isSeasonOnChain = !!activeSeasonConfig;
     
     // If it's an on-chain season and the user is connected to the wrong network, show a helpful message.
-    // The `initialLoad` check prevents showing this message prematurely on desktop client full reloads.
-    if (isSeasonOnChain && isConnected && chainId !== activeSeasonConfig.chainId && !initialLoad) {
+    if (isSeasonOnChain && isConnected && chainId !== activeSeasonConfig.chainId) {
         return (
             <div className="text-center text-yellow-300 p-8" role="alert">
                 Please switch to the {activeSeasonConfig.chainName} network to view the leaderboard.
@@ -196,9 +182,11 @@ const Leaderboard: React.FC<LeaderboardProps> = ({ isReady, activeSeason }) => {
     }
 
     if (leaderboardData.length === 0) {
-        // Provide a more specific message if the season is on-chain but the contract call is not yet enabled/loading
         if (isSeasonOnChain) {
-            return <div className="text-center text-slate-400 p-8">Connecting to on-chain leaderboard...</div>
+            if (!isConnected) {
+                return <div className="text-center text-slate-400 p-8">Waiting for wallet connection...</div>;
+            }
+            return <div className="text-center text-slate-400 p-8">No scores yet. Be the first!</div>;
         }
         return <div className="text-center text-slate-400 p-8">No scores yet. Be the first!</div>;
     }
