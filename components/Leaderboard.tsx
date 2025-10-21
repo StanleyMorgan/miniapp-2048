@@ -189,11 +189,11 @@ const Leaderboard: React.FC<LeaderboardProps> = ({ isReady, activeSeason }) => {
               ${isCurrentUser ? 'bg-orange-500/20 border border-orange-500' : 'bg-slate-700'}
             `}
           >
-            <span className="w-10 text-left font-bold text-orange-400">#{rank}</span>
+            <span className="w-16 text-left font-bold text-orange-400">#{rank}</span>
             <span className="flex-1 text-center text-white truncate" title={displayName}>
               {displayName}
             </span>
-            <span className="w-20 text-right font-bold text-white">{score}</span>
+            <span className="w-16 text-right font-bold text-white">{score}</span>
           </div>
         ))}
       </div>
@@ -204,9 +204,9 @@ const Leaderboard: React.FC<LeaderboardProps> = ({ isReady, activeSeason }) => {
     <div className="bg-slate-600 p-4 rounded-lg w-full animate-fade-in">
       <h2 className="text-2xl font-bold text-center mb-4">Leaderboard</h2>
       <div className="flex items-center gap-2 px-3 text-sm text-slate-400 font-bold mb-2">
-        <span className="w-10 text-left">Rank</span>
+        <span className="w-16 text-left">Rank</span>
         <span className="flex-1 text-center">Player</span>
-        <span className="w-20 text-right">Score</span>
+        <span className="w-16 text-right">Score</span>
       </div>
       {renderContent()}
     </div>
