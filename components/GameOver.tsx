@@ -22,9 +22,9 @@ const GameOver: React.FC<GameOverProps> = ({ onRestart, score, onSubmitScore, is
     if (activeSeason !== 'farcaster' && seasonName) {
       // On-chain season message
       if (userRank) {
-        text = `I just reached rank #${userRank} with a score of ${score} in the 2048 Mini App's ${seasonName}! Can you beat it?`;
+        text = `I just reached rank #${userRank} with a score of ${score} in the 2048 Mini App during ${seasonName}! Can you beat it?`;
       } else {
-        text = `I just set a new high score of ${score} in the 2048 Mini App's ${seasonName}! Can you beat it?`;
+        text = `I just set a new high score of ${score} in the 2048 Mini App during ${seasonName}! Can you beat it?`;
       }
     } else {
       // Default Farcaster season message
