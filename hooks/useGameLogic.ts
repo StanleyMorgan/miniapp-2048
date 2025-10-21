@@ -75,7 +75,7 @@ export const useGameLogic = (isSdkReady: boolean, activeSeason: Season) => {
     functionName: 'results',
     args: [userAddress as `0x${string}`],
     query: {
-      enabled: isSdkReady && !!userAddress && !!activeSeasonConfig,
+      enabled: isSdkReady && !!userAddress && !!activeSeasonConfig && isConnected && chain?.id === activeSeasonConfig.chainId,
     }
   });
 
