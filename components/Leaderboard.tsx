@@ -30,7 +30,23 @@ const Leaderboard: React.FC<LeaderboardProps> = ({ isReady, activeSeason }) => {
   const [leaderboardData, setLeaderboardData] = useState<LeaderboardEntry[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [isWagmiReady, setIsWagmiReady] = useState(false); // State to manage initial wagmi sync
   const { address: userAddress, chainId, isConnected } = useAccount();
+
+  // WORKAROUND: Fix for a race condition on the Farcaster desktop client.
+  // After a full page reload, the mini-app can initialize before the Farcaster
+  // client provides the correct wallet/network info to the wagmi connector.
+  // This can lead to the app briefly thinking it's on the wrong network.
+  // We introduce a small delay on the first load to give wagmi time to sync up.
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setIsWagmiReady(true);
+    }, 500); // A 500ms delay should be sufficient for the client to respond.
+
+    // Cleanup the timer if the component unmounts.
+    return () => clearTimeout(timer);
+  }, []); // This effect runs only once when the component first mounts.
+
 
   const activeSeasonConfig = isOnChainSeason(activeSeason) ? onChainSeasonConfigs[activeSeason] : null;
 
@@ -44,7 +60,8 @@ const Leaderboard: React.FC<LeaderboardProps> = ({ isReady, activeSeason }) => {
     functionName: 'getLeaderboard',
     query: { 
       // Only enable the query if the user is connected to the correct chain for the selected season.
-      enabled: isReady && !!activeSeasonConfig && isConnected && chainId === activeSeasonConfig.chainId 
+      // Also, wait for our wagmi sync workaround to complete.
+      enabled: isReady && !!activeSeasonConfig && isConnected && chainId === activeSeasonConfig.chainId && isWagmiReady
     }
   });
 
@@ -121,6 +138,11 @@ const Leaderboard: React.FC<LeaderboardProps> = ({ isReady, activeSeason }) => {
 
   const renderContent = () => {
     const isSeasonOnChain = !!activeSeasonConfig;
+    
+    // Gate on-chain views behind our wagmi sync workaround.
+    if (isSeasonOnChain && !isWagmiReady) {
+        return <div className="text-center text-slate-400 p-8">Connecting to wallet...</div>;
+    }
     
     // If it's an on-chain season and the user is connected to the wrong network, show a helpful message.
     if (isSeasonOnChain && isConnected && chainId !== activeSeasonConfig.chainId) {
