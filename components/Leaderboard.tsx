@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { sdk } from '@farcaster/miniapp-sdk';
 import { useReadContract, useAccount } from 'wagmi';
 import {
@@ -31,6 +31,17 @@ const Leaderboard: React.FC<LeaderboardProps> = ({ isReady, activeSeason }) => {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const { address: userAddress, chainId, isConnected } = useAccount();
+  const [initialLoad, setInitialLoad] = useState(true);
+
+  // This effect runs only once on component mount to set the initial load flag to false after a delay.
+  // This is a workaround for a race condition on the Farcaster desktop client where the wallet/network
+  // info might not be immediately available on a full page reload.
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setInitialLoad(false);
+    }, 500); // Wait 500ms before attempting to check network status
+    return () => clearTimeout(timer);
+  }, []);
 
   const activeSeasonConfig = isOnChainSeason(activeSeason) ? onChainSeasonConfigs[activeSeason] : null;
 
@@ -44,7 +55,8 @@ const Leaderboard: React.FC<LeaderboardProps> = ({ isReady, activeSeason }) => {
     functionName: 'getLeaderboard',
     query: { 
       // Only enable the query if the user is connected to the correct chain for the selected season.
-      enabled: isReady && !!activeSeasonConfig && isConnected && chainId === activeSeasonConfig.chainId 
+      // We also wait for the initialLoad delay to pass to avoid premature checks.
+      enabled: isReady && !!activeSeasonConfig && isConnected && chainId === activeSeasonConfig.chainId && !initialLoad
     }
   });
 
@@ -53,6 +65,7 @@ const Leaderboard: React.FC<LeaderboardProps> = ({ isReady, activeSeason }) => {
     const fetchFarcasterLeaderboard = async () => {
       setIsLoading(true);
       setError(null);
+      setLeaderboardData([]); // Clear previous data
       const BACKEND_URL = '/api/leaderboard';
 
       try {
@@ -90,6 +103,7 @@ const Leaderboard: React.FC<LeaderboardProps> = ({ isReady, activeSeason }) => {
       }
     };
     
+    // For on-chain seasons, we depend on the other useEffect. This one handles Farcaster.
     if (isReady && activeSeason === 'farcaster') {
         fetchFarcasterLeaderboard();
     }
@@ -97,33 +111,38 @@ const Leaderboard: React.FC<LeaderboardProps> = ({ isReady, activeSeason }) => {
 
   // Effect for processing on-chain leaderboard data from the wagmi hook
   useEffect(() => {
+    // This logic handles the state changes for on-chain seasons specifically.
     if (isReady && activeSeasonConfig) {
-        if (Array.isArray(onChainLeaderboard)) {
-            const formattedData = (onChainLeaderboard as { player: string; score: bigint }[])
-                .map((entry, index) => ({
-                    rank: index + 1, // Placeholder rank
-                    displayName: `${entry.player.slice(0, 6)}...${entry.player.slice(-4)}`,
-                    fid: index + 1, // Not a real FID, just a unique key
-                    score: Number(entry.score),
-                    isCurrentUser: !!userAddress && userAddress.toLowerCase() === entry.player.toLowerCase(),
-                }))
-                .sort((a, b) => b.score - a.score) // Sort by score descending
-                .map((entry, index) => ({ ...entry, rank: index + 1 })); // Re-assign rank after sorting
-            
-            setLeaderboardData(formattedData);
-        } else {
-            // Clear data when switching to an on-chain season before data is loaded
-            setLeaderboardData([]);
-        }
+      setIsLoading(isOnChainLoading);
+      setError(onChainError ? 'Could not load on-chain leaderboard.' : null);
+
+      if (Array.isArray(onChainLeaderboard)) {
+        const formattedData = (onChainLeaderboard as { player: string; score: bigint }[])
+          .map((entry, index) => ({
+            rank: index + 1, // Placeholder rank
+            displayName: `${entry.player.slice(0, 6)}...${entry.player.slice(-4)}`,
+            fid: index + 1, // Not a real FID, just a unique key for React
+            score: Number(entry.score),
+            isCurrentUser: !!userAddress && userAddress.toLowerCase() === entry.player.toLowerCase(),
+          }))
+          .sort((a, b) => b.score - a.score) // Sort by score descending
+          .map((entry, index) => ({ ...entry, rank: index + 1 })); // Re-assign rank after sorting
+        
+        setLeaderboardData(formattedData);
+      } else {
+        // Clear data when switching to an on-chain season before data is loaded or if there's an error.
+        setLeaderboardData([]);
+      }
     }
-  }, [isReady, activeSeasonConfig, onChainLeaderboard, userAddress]);
+  }, [isReady, activeSeasonConfig, onChainLeaderboard, userAddress, isOnChainLoading, onChainError]);
 
 
   const renderContent = () => {
     const isSeasonOnChain = !!activeSeasonConfig;
     
     // If it's an on-chain season and the user is connected to the wrong network, show a helpful message.
-    if (isSeasonOnChain && isConnected && chainId !== activeSeasonConfig.chainId) {
+    // The `initialLoad` check prevents showing this message prematurely on desktop client full reloads.
+    if (isSeasonOnChain && isConnected && chainId !== activeSeasonConfig.chainId && !initialLoad) {
         return (
             <div className="text-center text-yellow-300 p-8" role="alert">
                 Please switch to the {activeSeasonConfig.chainName} network to view the leaderboard.
@@ -131,10 +150,7 @@ const Leaderboard: React.FC<LeaderboardProps> = ({ isReady, activeSeason }) => {
         );
     }
 
-    const effectiveIsLoading = (activeSeason === 'farcaster' && isLoading) || (isSeasonOnChain && isOnChainLoading);
-    const effectiveError = (activeSeason === 'farcaster' && error) || (isSeasonOnChain && onChainError ? 'Could not load on-chain leaderboard.' : null);
-
-    if (effectiveIsLoading) {
+    if (isLoading) {
       return (
         <div className="flex flex-col gap-2 animate-pulse" role="status">
           {Array.from({ length: 15 }).map((_, i) => (
@@ -144,13 +160,13 @@ const Leaderboard: React.FC<LeaderboardProps> = ({ isReady, activeSeason }) => {
       );
     }
 
-    if (effectiveError) {
-      return <div className="text-center text-red-400 p-8" role="alert">{effectiveError}</div>;
+    if (error) {
+      return <div className="text-center text-red-400 p-8" role="alert">{error}</div>;
     }
 
     if (leaderboardData.length === 0) {
         // Provide a more specific message if the season is on-chain but the contract call is not yet enabled/loading
-        if (isSeasonOnChain && !isOnChainLoading && !onChainLeaderboard) {
+        if (isSeasonOnChain) {
             return <div className="text-center text-slate-400 p-8">Connecting to on-chain leaderboard...</div>
         }
         return <div className="text-center text-slate-400 p-8">No scores yet. Be the first!</div>;
@@ -169,7 +185,7 @@ const Leaderboard: React.FC<LeaderboardProps> = ({ isReady, activeSeason }) => {
           <div 
             key={`${rank}-${fid}-${displayName}`} 
             className={`
-              grid grid-cols-3 gap-2 p-3 rounded-md items-center text-lg
+              grid grid-cols-[auto_1fr_auto] gap-2 p-3 rounded-md items-center text-lg
               transition-colors duration-200
               ${isCurrentUser ? 'bg-orange-500/20 border border-orange-500' : 'bg-slate-700'}
             `}
@@ -188,7 +204,7 @@ const Leaderboard: React.FC<LeaderboardProps> = ({ isReady, activeSeason }) => {
   return (
     <div className="bg-slate-600 p-4 rounded-lg w-full animate-fade-in">
       <h2 className="text-2xl font-bold text-center mb-4">Leaderboard</h2>
-      <div className="grid grid-cols-3 gap-2 px-3 text-sm text-slate-400 font-bold mb-2">
+      <div className="grid grid-cols-[auto_1fr_auto] gap-2 px-3 text-sm text-slate-400 font-bold mb-2">
         <span>Rank</span>
         <span className="text-center">Player</span>
         <span className="text-right">Score</span>
