@@ -22,9 +22,6 @@ export async function POST(request: Request) {
   const domain = host;
   const token = authorization.split(' ')[1];
 
-  // Enhanced logging for debugging
-  console.log(`[submit-score] Attempting to verify token. Domain: "${domain}". Token starts with: "${token.substring(0, 10)}..."`);
-
   try {
     // Step 1: Verify the JWT from the request header.
     const payload = await quickAuthClient.verifyJwt({
@@ -52,7 +49,6 @@ export async function POST(request: Request) {
         const userData = await userResponse.json();
         if (userData && userData.result && userData.result.user) {
           username = userData.result.user.username;
-          console.log(`[submit-score] Fetched username "${username}" for FID ${fid}`);
         }
       } else {
          console.warn(`[submit-score] Could not fetch username for FID ${fid}. Status: ${userResponse.status}`);
@@ -69,7 +65,6 @@ export async function POST(request: Request) {
         const addressData = await addressResponse.json();
         if (addressData && addressData.result && addressData.result.address) {
           primaryAddress = addressData.result.address.address;
-          console.log(`[submit-score] Fetched primary address "${primaryAddress}" for FID ${fid}`);
         }
       } else {
         console.warn(`[submit-score] Could not fetch primary address for FID ${fid}. Status: ${addressResponse.status}`);

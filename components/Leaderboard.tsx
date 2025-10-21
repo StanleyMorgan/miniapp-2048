@@ -30,9 +30,22 @@ const Leaderboard: React.FC<LeaderboardProps> = ({ isReady, activeSeason }) => {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const { address: userAddress, chainId, isConnected } = useAccount();
+  const [initialLoad, setInitialLoad] = useState(true);
+
+  // This effect runs only once on component mount to set the initial load flag to false after a delay.
+  // This is a workaround for a race condition on the Farcaster desktop client where the wallet/network
+  // info might not be immediately available on a full page reload.
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setInitialLoad(false);
+    }, 500); // Wait 500ms before attempting to check network status
+    return () => clearTimeout(timer);
+  }, []);
 
   const activeSeasonConfig = isOnChainSeason(activeSeason) ? onChainSeasonConfigs[activeSeason] : null;
 
+  // FIX: `onSuccess` and `onError` callbacks are deprecated in wagmi/TanStack Query v5.
+  // Replaced with `useEffect` to handle side-effects like logging.
   const { 
     data: onChainLeaderboard, 
     error: onChainError, 
@@ -43,10 +56,20 @@ const Leaderboard: React.FC<LeaderboardProps> = ({ isReady, activeSeason }) => {
     functionName: 'getLeaderboard',
     query: { 
       // Only enable the query if the user is connected to the correct chain for the selected season.
-      // The app's root logic now ensures that `isConnected` and `chainId` are stable before this component renders effectively.
-      enabled: isReady && !!activeSeasonConfig && isConnected && chainId === activeSeasonConfig.chainId
+      // We also wait for the initialLoad delay to pass to avoid premature checks.
+      enabled: isReady && !!activeSeasonConfig && isConnected && chainId === activeSeasonConfig.chainId && !initialLoad,
     }
   });
+
+  // Log on-chain leaderboard fetch status
+  useEffect(() => {
+    if (onChainLeaderboard) {
+      console.log(`[ONCHAIN] Successfully fetched leaderboard for ${activeSeason}. Found ${onChainLeaderboard.length} entries.`);
+    }
+    if (onChainError) {
+      console.error(`[ONCHAIN] Error fetching leaderboard for ${activeSeason}:`, onChainError);
+    }
+  }, [onChainLeaderboard, onChainError, activeSeason]);
 
   // Effect for fetching the Farcaster leaderboard
   useEffect(() => {
@@ -129,7 +152,8 @@ const Leaderboard: React.FC<LeaderboardProps> = ({ isReady, activeSeason }) => {
     const isSeasonOnChain = !!activeSeasonConfig;
     
     // If it's an on-chain season and the user is connected to the wrong network, show a helpful message.
-    if (isSeasonOnChain && isConnected && chainId !== activeSeasonConfig.chainId) {
+    // The `initialLoad` check prevents showing this message prematurely on desktop client full reloads.
+    if (isSeasonOnChain && isConnected && chainId !== activeSeasonConfig.chainId && !initialLoad) {
         return (
             <div className="text-center text-yellow-300 p-8" role="alert">
                 Please switch to the {activeSeasonConfig.chainName} network to view the leaderboard.

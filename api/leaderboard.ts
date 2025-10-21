@@ -31,9 +31,6 @@ export async function GET(request: Request) {
     }
     const domain = host;
     
-    // Enhanced logging for debugging
-    console.log(`[leaderboard] Attempting to verify token. Domain: "${domain}". Token starts with: "${token.substring(0, 10)}..."`);
-
     try {
       const payload = await quickAuthClient.verifyJwt({ token, domain });
       currentUserFid = Number(payload.sub);

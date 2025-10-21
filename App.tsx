@@ -11,7 +11,6 @@ import { useAccount, useSwitchChain } from 'wagmi';
 import { onChainSeasonConfigs } from './constants/contract';
 
 const App: React.FC = () => {
-  console.log('App component mounting...');
   const [touchStart, setTouchStart] = useState<{x: number, y: number} | null>(null);
   const [activeTab, setActiveTab] = useState<'game' | 'top'>('game');
   const [activeSeason, setActiveSeason] = useState<Season>('farcaster');
@@ -48,16 +47,15 @@ const App: React.FC = () => {
   useEffect(() => {
     const seasonConfig = onChainSeasonConfigs[activeSeason];
     if (isConnected && seasonConfig && chain?.id !== seasonConfig.chainId && switchChain) {
-      console.log(`Switching network from ${chain?.id} to ${seasonConfig.chainId} for season ${activeSeason}`);
+      console.log(`[ONCHAIN] Requesting network switch from chain ${chain?.id} to ${seasonConfig.chainId} for season ${activeSeason}`);
       switchChain({ chainId: seasonConfig.chainId });
     }
   }, [activeSeason, isConnected, chain, switchChain]);
 
   useEffect(() => {
-    console.log('App useEffect for SDK initialization running.');
     // Ensure the SDK is ready before we attempt to use any of its functionality.
     sdk.actions.ready().then(() => {
-        console.log('Farcaster SDK is ready.');
+        console.log('[SDK] Farcaster SDK is ready.');
         setIsSdkReady(true)
     });
 
@@ -124,7 +122,6 @@ const App: React.FC = () => {
 
 
   const renderGameContent = () => {
-    console.log(`Rendering game content. isInitializing: ${isInitializing}`);
     if (isInitializing) {
       return (
         <div className="flex-grow flex flex-col items-center justify-center">
@@ -160,7 +157,6 @@ const App: React.FC = () => {
     );
   }
 
-  console.log(`App component rendering. activeTab: ${activeTab}, isInitializing: ${isInitializing}`);
   return (
     <div className="min-h-screen w-screen text-white flex flex-col items-center p-4 font-sans">
       <div className="w-full sm:max-w-md mx-auto flex flex-col flex-grow">
