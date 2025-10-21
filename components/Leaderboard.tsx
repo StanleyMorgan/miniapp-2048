@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef } from 'react';
 import { sdk } from '@farcaster/miniapp-sdk';
 import { useReadContract, useAccount } from 'wagmi';
@@ -185,16 +184,16 @@ const Leaderboard: React.FC<LeaderboardProps> = ({ isReady, activeSeason }) => {
           <div 
             key={`${rank}-${fid}-${displayName}`} 
             className={`
-              grid grid-cols-[auto_1fr_auto] gap-2 p-3 rounded-md items-center text-lg
+              flex items-center gap-2 p-3 rounded-md text-lg
               transition-colors duration-200
               ${isCurrentUser ? 'bg-orange-500/20 border border-orange-500' : 'bg-slate-700'}
             `}
           >
-            <span className="font-bold text-orange-400">#{rank}</span>
-            <span className="text-center text-white truncate" title={displayName}>
+            <span className="w-16 text-left font-bold text-orange-400">#{rank}</span>
+            <span className="flex-1 text-center text-white truncate" title={displayName}>
               {displayName}
             </span>
-            <span className="text-right font-bold text-white">{score}</span>
+            <span className="w-24 text-right font-bold text-white">{score}</span>
           </div>
         ))}
       </div>
@@ -204,10 +203,10 @@ const Leaderboard: React.FC<LeaderboardProps> = ({ isReady, activeSeason }) => {
   return (
     <div className="bg-slate-600 p-4 rounded-lg w-full animate-fade-in">
       <h2 className="text-2xl font-bold text-center mb-4">Leaderboard</h2>
-      <div className="grid grid-cols-[auto_1fr_auto] gap-2 px-3 text-sm text-slate-400 font-bold mb-2">
-        <span>Rank</span>
-        <span className="text-center">Player</span>
-        <span className="text-right">Score</span>
+      <div className="flex items-center gap-2 px-3 text-sm text-slate-400 font-bold mb-2">
+        <span className="w-16 text-left">Rank</span>
+        <span className="flex-1 text-center">Player</span>
+        <span className="w-24 text-right">Score</span>
       </div>
       {renderContent()}
     </div>
