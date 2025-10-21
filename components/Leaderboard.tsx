@@ -31,7 +31,7 @@ const Leaderboard: React.FC<LeaderboardProps> = ({ isReady, activeSeason }) => {
   const [leaderboardData, setLeaderboardData] = useState<LeaderboardEntry[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const { address: userAddress } = useAccount();
+  const { address: userAddress, chainId, isConnected } = useAccount();
 
   const activeSeasonConfig = isOnChainSeason(activeSeason) ? onChainSeasonConfigs[activeSeason] : null;
 
@@ -43,7 +43,10 @@ const Leaderboard: React.FC<LeaderboardProps> = ({ isReady, activeSeason }) => {
     address: activeSeasonConfig?.address,
     abi: activeSeasonConfig?.abi,
     functionName: 'getLeaderboard',
-    query: { enabled: isReady && !!activeSeasonConfig }
+    query: { 
+      // Only enable the query if the user is connected to the correct chain for the selected season.
+      enabled: isReady && !!activeSeasonConfig && isConnected && chainId === activeSeasonConfig.chainId 
+    }
   });
 
   useEffect(() => {
@@ -90,6 +93,8 @@ const Leaderboard: React.FC<LeaderboardProps> = ({ isReady, activeSeason }) => {
     if (!isReady) return;
 
     if (activeSeasonConfig) {
+      // For on-chain seasons, we now rely purely on the useReadContract hook.
+      // We still need to handle the formatting of the returned data.
       if (Array.isArray(onChainLeaderboard)) {
         const formattedData = (onChainLeaderboard as { player: string; score: bigint }[])
             .map((entry, index) => ({
@@ -107,12 +112,23 @@ const Leaderboard: React.FC<LeaderboardProps> = ({ isReady, activeSeason }) => {
         setLeaderboardData([]);
       }
     } else {
+      // Fallback to Farcaster leaderboard for non-on-chain seasons.
       fetchFarcasterLeaderboard();
     }
-  }, [isReady, activeSeason, activeSeasonConfig, onChainLeaderboard, userAddress]);
+  }, [isReady, activeSeason, activeSeasonConfig, onChainLeaderboard, userAddress, chainId]);
 
   const renderContent = () => {
     const isSeasonOnChain = !!activeSeasonConfig;
+    
+    // If it's an on-chain season and the user is connected to the wrong network, show a helpful message.
+    if (isSeasonOnChain && isConnected && chainId !== activeSeasonConfig.chainId) {
+        return (
+            <div className="text-center text-yellow-300 p-8" role="status">
+                Please switch to the {activeSeasonConfig.chainName} network to view the leaderboard.
+            </div>
+        );
+    }
+
     const effectiveIsLoading = isLoading || (isSeasonOnChain && isOnChainLoading);
     const effectiveError = error || (isSeasonOnChain && onChainError ? 'Could not load on-chain leaderboard.' : null);
 
