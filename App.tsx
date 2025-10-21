@@ -17,7 +17,7 @@ const App: React.FC = () => {
   const [activeSeason, setActiveSeason] = useState<Season>('farcaster');
   const [isSdkReady, setIsSdkReady] = useState(false);
   const [shouldShowSaveFlow, setShouldShowSaveFlow] = useState(false);
-  const { isConnected, chain, status: wagmiStatus } = useAccount();
+  const { isConnected, chain } = useAccount();
   const { switchChain } = useSwitchChain();
 
   const { 
@@ -36,7 +36,7 @@ const App: React.FC = () => {
     isInitializing,
     userAddress,
     submissionStatus
-  } = useGameLogic(isSdkReady, activeSeason, wagmiStatus);
+  } = useGameLogic(isSdkReady, activeSeason);
 
   const handleGlobalKeyDown = useCallback((event: KeyboardEvent) => {
     if (activeTab === 'game') {
