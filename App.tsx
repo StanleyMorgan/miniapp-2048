@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback, useRef } from 'react';
 import { sdk } from '@farcaster/miniapp-sdk';
 import { useGameLogic } from './hooks/useGameLogic';
 import GameBoard from './components/GameBoard';
@@ -20,6 +20,7 @@ const App: React.FC = () => {
   const [isSdkReady, setIsSdkReady] = useState(false);
   const { isConnected, chain, status: wagmiStatus } = useAccount();
   const [isAppReady, setIsAppReady] = useState(false); // This will gate the whole app
+  const appReadyTimeoutRef = useRef<number | null>(null);
 
   const { switchChain, isPending: isSwitchingChain } = useSwitchChain();
 
@@ -53,14 +54,38 @@ const App: React.FC = () => {
     });
   }, []);
   
-  // Effect to determine when the entire app is ready to render.
+  // Effect to determine when the entire app is ready to render, with a timeout and auto-reload for stuck reconnects.
   useEffect(() => {
-    // We are ready only when the SDK is ready AND wagmi has a definitive status.
-    // 'reconnecting' is a transient state; we wait until it resolves to 'connected' or 'disconnected'.
-    if (isSdkReady && (wagmiStatus === 'connected' || wagmiStatus === 'disconnected')) {
-      console.log(`[APP] App is ready. WAGMI status: ${wagmiStatus}`);
-      setIsAppReady(true);
+    // Always clear the previous timeout when this effect re-runs
+    if (appReadyTimeoutRef.current) {
+      clearTimeout(appReadyTimeoutRef.current);
+      appReadyTimeoutRef.current = null;
     }
+
+    console.log(`[APP] Readiness check: isSdkReady=${isSdkReady}, wagmiStatus=${wagmiStatus}`);
+
+    if (isSdkReady) {
+      if (wagmiStatus === 'connected' || wagmiStatus === 'disconnected') {
+        // Ideal case: wagmi has a definitive status.
+        console.log(`[APP] App is ready. WAGMI status: ${wagmiStatus}`);
+        setIsAppReady(true);
+      } else if (wagmiStatus === 'reconnecting') {
+        // Wagmi is trying to reconnect. This can get stuck on cold starts.
+        // Set a 3-second timeout. If it's still reconnecting, reload the app.
+        console.log('[APP] Wagmi is reconnecting. Setting a 3-second timeout to prevent getting stuck.');
+        appReadyTimeoutRef.current = window.setTimeout(() => {
+          console.warn('[APP] Timeout reached while reconnecting. Reloading the application to resolve the stuck state.');
+          window.location.reload();
+        }, 3000); // 3-second timeout
+      }
+    }
+    
+    // Cleanup function to clear timeout if the component unmounts
+    return () => {
+      if (appReadyTimeoutRef.current) {
+        clearTimeout(appReadyTimeoutRef.current);
+      }
+    };
   }, [isSdkReady, wagmiStatus]);
 
 
