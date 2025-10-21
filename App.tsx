@@ -55,12 +55,14 @@ const App: React.FC = () => {
   
   // Effect to determine when the entire app is ready to render.
   useEffect(() => {
-    // We are ready only when the SDK is ready AND wagmi has settled its initial connection status.
-    if (isSdkReady && wagmiStatus !== 'connecting') {
+    // We are ready only when the SDK is ready AND wagmi has a definitive status.
+    // 'reconnecting' is a transient state; we wait until it resolves to 'connected' or 'disconnected'.
+    if (isSdkReady && (wagmiStatus === 'connected' || wagmiStatus === 'disconnected')) {
       console.log(`[APP] App is ready. WAGMI status: ${wagmiStatus}`);
       setIsAppReady(true);
     }
   }, [isSdkReady, wagmiStatus]);
+
 
   // Log for detailed WAGMI connection status
   useEffect(() => {
