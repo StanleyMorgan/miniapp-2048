@@ -11,14 +11,20 @@ import { useAccount, useSwitchChain } from 'wagmi';
 import { onChainSeasonConfigs } from './constants/contract';
 
 const App: React.FC = () => {
+  // --- Hooks must be at the top level ---
   const [touchStart, setTouchStart] = useState<{x: number, y: number} | null>(null);
   const [activeTab, setActiveTab] = useState<'game' | 'top'>('game');
   const [activeSeason, setActiveSeason] = useState<Season>('farcaster');
+  
+  // --- New Robust Initialization State Management ---
   const [isSdkReady, setIsSdkReady] = useState(false);
-  const [shouldShowSaveFlow, setShouldShowSaveFlow] = useState(false);
   const { isConnected, chain, status: wagmiStatus } = useAccount();
+  const [isAppReady, setIsAppReady] = useState(false); // This will gate the whole app
+
   const { switchChain, isPending: isSwitchingChain } = useSwitchChain();
 
+  // Pass `isAppReady` to the game logic hook. It will now wait for the app to be fully
+  // initialized before fetching game state, preventing race conditions.
   const { 
     tiles, 
     score, 
@@ -32,12 +38,31 @@ const App: React.FC = () => {
     isSubmitting,
     hasSubmittedScore,
     userRank,
-    isInitializing,
+    isInitializing, // This is for game state, not app init
     userAddress,
     submissionStatus
-  } = useGameLogic(isSdkReady, activeSeason);
+  } = useGameLogic(isAppReady, activeSeason);
 
-  // New log for detailed WAGMI connection status
+  // --- Effects for Initialization and Event Handling ---
+
+  // Effect to determine when Farcaster SDK is ready
+  useEffect(() => {
+    sdk.actions.ready().then(() => {
+        console.log('[SDK] Farcaster SDK is ready.');
+        setIsSdkReady(true)
+    });
+  }, []);
+  
+  // Effect to determine when the entire app is ready to render.
+  useEffect(() => {
+    // We are ready only when the SDK is ready AND wagmi has settled its initial connection status.
+    if (isSdkReady && wagmiStatus !== 'connecting') {
+      console.log(`[APP] App is ready. WAGMI status: ${wagmiStatus}`);
+      setIsAppReady(true);
+    }
+  }, [isSdkReady, wagmiStatus]);
+
+  // Log for detailed WAGMI connection status
   useEffect(() => {
     console.log(`[WAGMI] Connection status changed to: ${wagmiStatus}. ChainID: ${chain?.id}`);
   }, [wagmiStatus, chain?.id]);
@@ -50,20 +75,17 @@ const App: React.FC = () => {
 
   // Effect to automatically switch network when an on-chain season is selected
   useEffect(() => {
+    // This crucial effect will now only run when the app is fully ready.
+    if (!isAppReady) return;
+
     const seasonConfig = onChainSeasonConfigs[activeSeason];
     if (isConnected && seasonConfig && chain?.id !== seasonConfig.chainId && switchChain && !isSwitchingChain) {
       console.log(`[ONCHAIN] Requesting network switch from chain ${chain?.id} to ${seasonConfig.chainId} for season ${activeSeason}`);
       switchChain({ chainId: seasonConfig.chainId });
     }
-  }, [activeSeason, isConnected, chain, switchChain, isSwitchingChain]);
+  }, [activeSeason, isConnected, chain, switchChain, isSwitchingChain, isAppReady]);
 
   useEffect(() => {
-    // Ensure the SDK is ready before we attempt to use any of its functionality.
-    sdk.actions.ready().then(() => {
-        console.log('[SDK] Farcaster SDK is ready.');
-        setIsSdkReady(true)
-    });
-
     window.addEventListener('keydown', handleGlobalKeyDown);
     return () => {
       window.removeEventListener('keydown', handleGlobalKeyDown);
@@ -71,7 +93,6 @@ const App: React.FC = () => {
   }, [handleGlobalKeyDown]);
 
   const handleTouchStart = (e: React.TouchEvent) => {
-    // No need to check activeTab here, as this handler is only on the game container
     if (e.touches.length === 1) {
       setTouchStart({ x: e.touches[0].clientX, y: e.touches[0].clientY });
     }
@@ -101,15 +122,12 @@ const App: React.FC = () => {
     setTouchStart(null);
   };
   
-  // This logic determines if a new best score has been achieved.
+  const [shouldShowSaveFlow, setShouldShowSaveFlow] = useState(false);
+
   const isNewBestScore = serverBestScore !== null
     ? score > serverBestScore
     : score > bestScore;
 
-  // This effect "latches" the decision to show the save/share flow.
-  // When the game ends, we check if it's a new best score. If so, we set a state.
-  // This state persists even if `isNewBestScore` becomes false after saving the score,
-  // ensuring the "Share" button can be shown. It resets on a new game.
   useEffect(() => {
     if (isGameOver) {
       if (isNewBestScore && score > 0) {
@@ -120,17 +138,25 @@ const App: React.FC = () => {
     }
   }, [isGameOver, isNewBestScore, score]);
 
-  // Determine which "best score" to display in the top controls.
-  // If the user is authenticated (serverBestScore is not null), we show their official score from the leaderboard.
-  // Otherwise, we fall back to the locally stored best score.
   const displayBestScore = serverBestScore !== null ? serverBestScore : bestScore;
 
+  // --- Render Logic ---
+
+  // Render a global initializing screen until the app is ready.
+  if (!isAppReady) {
+    return (
+      <div className="min-h-screen w-screen flex flex-col items-center justify-center">
+        <div className="animate-pulse text-slate-400">Initializing...</div>
+      </div>
+    );
+  }
 
   const renderGameContent = () => {
+    // This `isInitializing` is for loading the specific game state for a season.
     if (isInitializing) {
       return (
         <div className="flex-grow flex flex-col items-center justify-center">
-          <div className="animate-pulse text-slate-400">Initializing session...</div>
+          <div className="animate-pulse text-slate-400">Loading season...</div>
         </div>
       );
     }
@@ -169,7 +195,7 @@ const App: React.FC = () => {
         <SeasonSelector activeSeason={activeSeason} onSeasonChange={setActiveSeason} />
         
         <main className="flex-grow flex flex-col w-full items-center justify-center">
-          {activeTab === 'game' ? renderGameContent() : <Leaderboard isReady={isSdkReady} activeSeason={activeSeason} />}
+          {activeTab === 'game' ? renderGameContent() : <Leaderboard isReady={isAppReady} activeSeason={activeSeason} />}
         </main>
       </div>
     </div>
