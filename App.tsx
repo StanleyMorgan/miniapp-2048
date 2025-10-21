@@ -54,7 +54,7 @@ const App: React.FC = () => {
     });
   }, []);
   
-  // Effect to determine when the entire app is ready to render, with a timeout and auto-reload for stuck reconnects.
+  // Effect to determine when the entire app is ready to render, with a timeout and auto-reload for stuck states.
   useEffect(() => {
     // Always clear the previous timeout when this effect re-runs
     if (appReadyTimeoutRef.current) {
@@ -69,12 +69,12 @@ const App: React.FC = () => {
         // Ideal case: wagmi has a definitive status.
         console.log(`[APP] App is ready. WAGMI status: ${wagmiStatus}`);
         setIsAppReady(true);
-      } else if (wagmiStatus === 'reconnecting') {
-        // Wagmi is trying to reconnect. This can get stuck on cold starts.
-        // Set a 3-second timeout. If it's still reconnecting, reload the app.
-        console.log('[APP] Wagmi is reconnecting. Setting a 3-second timeout to prevent getting stuck.');
+      } else if (wagmiStatus === 'connecting' || wagmiStatus === 'reconnecting') {
+        // Wagmi is trying to connect or reconnect. This can get stuck on cold starts.
+        // Set a 3-second timeout. If it's still in this state, reload the app.
+        console.log(`[APP] Wagmi is in '${wagmiStatus}' state. Setting a 3-second timeout to prevent getting stuck.`);
         appReadyTimeoutRef.current = window.setTimeout(() => {
-          console.warn('[APP] Timeout reached while reconnecting. Reloading the application to resolve the stuck state.');
+          console.warn(`[APP] Timeout reached while in '${wagmiStatus}' state. Reloading the application to resolve the stuck state.`);
           window.location.reload();
         }, 3000); // 3-second timeout
       }
