@@ -7,7 +7,7 @@ interface SeasonSelectorProps {
   onSeasonChange: (season: Season) => void;
 }
 
-const seasons: { id: Season; name: string }[] = [
+export const seasons: { id: Season; name: string }[] = [
   { id: 'farcaster', name: 'FARCASTER' },
   { id: 'monad-s0', name: 'MONAD S0' },
   { id: 'base-s0', name: 'BASE S0' },

@@ -1,4 +1,5 @@
 import React from 'react';
+import { Season, seasons } from './SeasonSelector';
 
 interface GameOverProps {
   onRestart: () => void;
@@ -9,15 +10,31 @@ interface GameOverProps {
   isNewBestScore: boolean;
   userRank: number | null;
   submissionStatus: string;
+  activeSeason: Season;
 }
 
-const GameOver: React.FC<GameOverProps> = ({ onRestart, score, onSubmitScore, isSubmitting, hasSubmittedScore, isNewBestScore, userRank, submissionStatus }) => {
+const GameOver: React.FC<GameOverProps> = ({ onRestart, score, onSubmitScore, isSubmitting, hasSubmittedScore, isNewBestScore, userRank, submissionStatus, activeSeason }) => {
   
   const handleShare = () => {
-    let text = `I just set a new high score of ${score} in the 2048 Mini App! Can you beat it?`;
-    if (userRank) {
-      text = `I just reached rank #${userRank} with a score of ${score} in the 2048 Mini App! Can you beat it?`;
+    let text: string;
+    const seasonName = seasons.find(s => s.id === activeSeason)?.name;
+
+    if (activeSeason !== 'farcaster' && seasonName) {
+      // On-chain season message
+      if (userRank) {
+        text = `I just reached rank #${userRank} with a score of ${score} in the 2048 Mini App's ${seasonName}! Can you beat it?`;
+      } else {
+        text = `I just set a new high score of ${score} in the 2048 Mini App's ${seasonName}! Can you beat it?`;
+      }
+    } else {
+      // Default Farcaster season message
+      if (userRank) {
+        text = `I just reached rank #${userRank} with a score of ${score} in the 2048 Mini App! Can you beat it?`;
+      } else {
+        text = `I just set a new high score of ${score} in the 2048 Mini App! Can you beat it?`;
+      }
     }
+
     const encodedText = encodeURIComponent(text);
     const appUrl = 'https://2048-base.vercel.app/'; // URL of your mini app
     const encodedAppUrl = encodeURIComponent(appUrl);

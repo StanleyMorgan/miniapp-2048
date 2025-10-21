@@ -208,6 +208,7 @@ const App: React.FC = () => {
               isNewBestScore={shouldShowSaveFlow}
               userRank={userRank}
               submissionStatus={submissionStatus}
+              activeSeason={activeSeason}
             />
           )}
         </div>
