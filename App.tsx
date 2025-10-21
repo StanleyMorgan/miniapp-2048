@@ -54,9 +54,9 @@ const App: React.FC = () => {
     });
   }, []);
   
-  // Effect to determine when the entire app is ready, preventing premature launch.
+  // Effect to determine when the entire app is ready to render, with a timeout and auto-reload for stuck states.
   useEffect(() => {
-    // Always clear any existing timeout when the dependencies change.
+    // Always clear the previous timeout when this effect re-runs
     if (appReadyTimeoutRef.current) {
       clearTimeout(appReadyTimeoutRef.current);
       appReadyTimeoutRef.current = null;
@@ -64,40 +64,29 @@ const App: React.FC = () => {
 
     console.log(`[APP] Readiness check: isSdkReady=${isSdkReady}, wagmiStatus=${wagmiStatus}`);
 
-    if (isAppReady) return; // Already ready, do nothing.
-
     if (isSdkReady) {
-      if (wagmiStatus === 'connected') {
-        // Best case: wallet is connected. The app is ready.
-        console.log('[APP] App is ready. WAGMI status: connected');
+      if (wagmiStatus === 'connected' || wagmiStatus === 'disconnected') {
+        // Ideal case: wagmi has a definitive status.
+        console.log(`[APP] App is ready. WAGMI status: ${wagmiStatus}`);
         setIsAppReady(true);
-      } else if (wagmiStatus === 'disconnected') {
-        // This could be the initial, transient state before reconnection.
-        // We will wait for a short period. If the status doesn't change,
-        // we'll assume it's final and proceed.
-        console.log('[APP] Wagmi is disconnected. Waiting 1.5s to confirm stable state.');
-        appReadyTimeoutRef.current = window.setTimeout(() => {
-          console.log('[APP] Timeout reached. Assuming disconnected is stable. App is ready.');
-          setIsAppReady(true);
-        }, 1500); // 1.5-second wait
       } else if (wagmiStatus === 'connecting' || wagmiStatus === 'reconnecting') {
-        // The wallet is actively trying to connect. We wait.
-        // We'll set a longer timeout here as a failsafe against getting stuck.
-        console.log(`[APP] Wagmi is '${wagmiStatus}'. Setting a 5s failsafe timeout.`);
+        // Wagmi is trying to connect or reconnect. This can get stuck on cold starts.
+        // Set a 3-second timeout. If it's still in this state, reload the app.
+        console.log(`[APP] Wagmi is in '${wagmiStatus}' state. Setting a 3-second timeout to prevent getting stuck.`);
         appReadyTimeoutRef.current = window.setTimeout(() => {
-           console.warn(`[APP] Failsafe timeout reached in '${wagmiStatus}' state. Assuming disconnected and proceeding.`);
-           setIsAppReady(true); // Proceed even if stuck, to not block the user forever.
-        }, 5000); // 5-second failsafe
+          console.warn(`[APP] Timeout reached while in '${wagmiStatus}' state. Reloading the application to resolve the stuck state.`);
+          window.location.reload();
+        }, 3000); // 3-second timeout
       }
     }
     
-    // Cleanup function to clear timeout if the component unmounts or deps change.
+    // Cleanup function to clear timeout if the component unmounts
     return () => {
       if (appReadyTimeoutRef.current) {
         clearTimeout(appReadyTimeoutRef.current);
       }
     };
-  }, [isSdkReady, wagmiStatus, isAppReady]);
+  }, [isSdkReady, wagmiStatus]);
 
 
   // Log for detailed WAGMI connection status
