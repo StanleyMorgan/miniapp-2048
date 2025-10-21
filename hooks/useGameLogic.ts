@@ -67,14 +67,22 @@ export const useGameLogic = (isSdkReady: boolean, activeSeason: Season) => {
   const { data: hash, writeContract, isPending, error: writeContractError } = useWriteContract();
   const { isLoading: isConfirming, isSuccess: isConfirmed, error: txReceiptError } = useWaitForTransactionReceipt({ hash });
   
-  // Log wallet connection status changes
+  const isBestScoreQueryEnabled = isSdkReady && !!userAddress && !!activeSeasonConfig && isConnected && chain?.id === activeSeasonConfig.chainId;
+
+  // New detailed log for query state
   useEffect(() => {
-    if (isConnected) {
-      console.log(`[ONCHAIN] Wallet connected. Address: ${wagmiAddress}, ChainID: ${chain?.id}`);
-    } else {
-      console.log('[ONCHAIN] Wallet disconnected.');
+    if (activeSeasonConfig) {
+        console.log(`[DEBUG] Best Score Query State for season '${activeSeason}':`, {
+            isSdkReady: isSdkReady,
+            hasUserAddress: !!userAddress,
+            isWalletConnected: isConnected,
+            currentChainId: chain?.id,
+            expectedChainId: activeSeasonConfig.chainId,
+            isCorrectChain: chain?.id === activeSeasonConfig.chainId,
+            isQueryEnabled: isBestScoreQueryEnabled,
+        });
     }
-  }, [isConnected, wagmiAddress, chain]);
+  }, [isSdkReady, userAddress, isConnected, chain?.id, activeSeason, activeSeasonConfig, isBestScoreQueryEnabled]);
   
   // FIX: `onSuccess` and `onError` callbacks are deprecated in wagmi/TanStack Query v5.
   // Replaced with `useEffect` to handle side-effects like logging.
@@ -84,7 +92,7 @@ export const useGameLogic = (isSdkReady: boolean, activeSeason: Season) => {
     functionName: 'results',
     args: [userAddress as `0x${string}`],
     query: {
-      enabled: isSdkReady && !!userAddress && !!activeSeasonConfig && isConnected && chain?.id === activeSeasonConfig.chainId,
+      enabled: isBestScoreQueryEnabled,
     }
   });
 

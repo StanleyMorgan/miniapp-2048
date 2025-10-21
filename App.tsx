@@ -16,8 +16,8 @@ const App: React.FC = () => {
   const [activeSeason, setActiveSeason] = useState<Season>('farcaster');
   const [isSdkReady, setIsSdkReady] = useState(false);
   const [shouldShowSaveFlow, setShouldShowSaveFlow] = useState(false);
-  const { isConnected, chain } = useAccount();
-  const { switchChain } = useSwitchChain();
+  const { isConnected, chain, status: wagmiStatus } = useAccount();
+  const { switchChain, isPending: isSwitchingChain } = useSwitchChain();
 
   const { 
     tiles, 
@@ -37,6 +37,11 @@ const App: React.FC = () => {
     submissionStatus
   } = useGameLogic(isSdkReady, activeSeason);
 
+  // New log for detailed WAGMI connection status
+  useEffect(() => {
+    console.log(`[WAGMI] Connection status changed to: ${wagmiStatus}. ChainID: ${chain?.id}`);
+  }, [wagmiStatus, chain?.id]);
+
   const handleGlobalKeyDown = useCallback((event: KeyboardEvent) => {
     if (activeTab === 'game') {
       handleKeyDown(event);
@@ -46,11 +51,11 @@ const App: React.FC = () => {
   // Effect to automatically switch network when an on-chain season is selected
   useEffect(() => {
     const seasonConfig = onChainSeasonConfigs[activeSeason];
-    if (isConnected && seasonConfig && chain?.id !== seasonConfig.chainId && switchChain) {
+    if (isConnected && seasonConfig && chain?.id !== seasonConfig.chainId && switchChain && !isSwitchingChain) {
       console.log(`[ONCHAIN] Requesting network switch from chain ${chain?.id} to ${seasonConfig.chainId} for season ${activeSeason}`);
       switchChain({ chainId: seasonConfig.chainId });
     }
-  }, [activeSeason, isConnected, chain, switchChain]);
+  }, [activeSeason, isConnected, chain, switchChain, isSwitchingChain]);
 
   useEffect(() => {
     // Ensure the SDK is ready before we attempt to use any of its functionality.

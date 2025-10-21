@@ -44,6 +44,25 @@ const Leaderboard: React.FC<LeaderboardProps> = ({ isReady, activeSeason }) => {
 
   const activeSeasonConfig = isOnChainSeason(activeSeason) ? onChainSeasonConfigs[activeSeason] : null;
 
+  const isQueryEnabled = isReady && !!activeSeasonConfig && isConnected && chainId === activeSeasonConfig.chainId && !initialLoad;
+
+  // New detailed log for query state, runs on every render for on-chain seasons
+  useEffect(() => {
+      if (isOnChainSeason(activeSeason)) {
+          console.log(`[DEBUG] Leaderboard Query State for season '${activeSeason}':`, {
+              isSdkReady: isReady,
+              hasActiveSeasonConfig: !!activeSeasonConfig,
+              isWalletConnected: isConnected,
+              currentChainId: chainId,
+              expectedChainId: activeSeasonConfig?.chainId,
+              isCorrectChain: chainId === activeSeasonConfig?.chainId,
+              initialLoadComplete: !initialLoad,
+              isQueryEnabled: isQueryEnabled,
+          });
+      }
+  });
+
+
   // FIX: `onSuccess` and `onError` callbacks are deprecated in wagmi/TanStack Query v5.
   // Replaced with `useEffect` to handle side-effects like logging.
   const { 
@@ -57,13 +76,14 @@ const Leaderboard: React.FC<LeaderboardProps> = ({ isReady, activeSeason }) => {
     query: { 
       // Only enable the query if the user is connected to the correct chain for the selected season.
       // We also wait for the initialLoad delay to pass to avoid premature checks.
-      enabled: isReady && !!activeSeasonConfig && isConnected && chainId === activeSeasonConfig.chainId && !initialLoad,
+      enabled: isQueryEnabled,
     }
   });
 
   // Log on-chain leaderboard fetch status
   useEffect(() => {
-    if (onChainLeaderboard) {
+    // FIX: The `useReadContract` hook returns data of type `unknown`. We must verify it's an array before accessing properties like `length`.
+    if (onChainLeaderboard && Array.isArray(onChainLeaderboard)) {
       console.log(`[ONCHAIN] Successfully fetched leaderboard for ${activeSeason}. Found ${onChainLeaderboard.length} entries.`);
     }
     if (onChainError) {
