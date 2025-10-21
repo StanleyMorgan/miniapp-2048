@@ -17,14 +17,15 @@ const GameOver: React.FC<GameOverProps> = ({ onRestart, score, onSubmitScore, is
   
   const handleShare = () => {
     let text: string;
-    const seasonName = seasons.find(s => s.id === activeSeason)?.name;
+    const seasonInfo = seasons.find(s => s.id === activeSeason);
+    const seasonShareName = seasonInfo?.shareName || seasonInfo?.name;
 
-    if (activeSeason !== 'farcaster' && seasonName) {
+    if (activeSeason !== 'farcaster' && seasonShareName) {
       // On-chain season message
       if (userRank) {
-        text = `I just reached rank #${userRank} with a score of ${score} in the 2048 Mini App during ${seasonName}! Can you beat it?`;
+        text = `I just reached rank #${userRank} with a score of ${score} in the 2048 Mini App during ${seasonShareName}! Can you beat it?`;
       } else {
-        text = `I just set a new high score of ${score} in the 2048 Mini App during ${seasonName}! Can you beat it?`;
+        text = `I just set a new high score of ${score} in the 2048 Mini App during ${seasonShareName}! Can you beat it?`;
       }
     } else {
       // Default Farcaster season message

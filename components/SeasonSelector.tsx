@@ -7,11 +7,11 @@ interface SeasonSelectorProps {
   onSeasonChange: (season: Season) => void;
 }
 
-export const seasons: { id: Season; name: string }[] = [
+export const seasons: { id: Season; name: string; shareName?: string }[] = [
   { id: 'farcaster', name: 'FARCASTER' },
-  { id: 'monad-s0', name: 'MONAD S0' },
-  { id: 'base-s0', name: 'BASE S0' },
-  { id: 'celo-s0', name: 'CELO S0' },
+  { id: 'monad-s0', name: 'MONAD S0', shareName: 'Monad Season 0' },
+  { id: 'base-s0', name: 'BASE S0', shareName: 'Base Season 0' },
+  { id: 'celo-s0', name: 'CELO S0', shareName: 'Celo Season 0' },
 ];
 
 const SeasonSelector: React.FC<SeasonSelectorProps> = ({ activeSeason, onSeasonChange }) => {
