@@ -25,7 +25,7 @@ const BEST_SCORE_KEY = 'bestScore2048';
 const ANIMATION_DURATION = 200;
 const INITIAL_MOVES_HASH = '0x' + '0'.repeat(64);
 
-export const useGameLogic = (isSdkReady: boolean, activeSeason: Season) => {
+export const useGameLogic = (isSdkReady: boolean, activeSeason: Season, wagmiStatus: ReturnType<typeof useAccount>['status']) => {
   const [isInitializing, setIsInitializing] = useState(true);
   const [userAddress, setUserAddress] = useState<string | null>(null);
   const [tiles, setTiles] = useState<TileData[]>([]);
@@ -75,7 +75,8 @@ export const useGameLogic = (isSdkReady: boolean, activeSeason: Season) => {
     functionName: 'results',
     args: [userAddress as `0x${string}`],
     query: {
-      enabled: isSdkReady && !!userAddress && !!activeSeasonConfig && isConnected && chain?.id === activeSeasonConfig.chainId,
+      // isConnected is a good check, but the wagmiStatus check in the main effect is more robust for initialization.
+      enabled: !!userAddress && !!activeSeasonConfig && isConnected && chain?.id === activeSeasonConfig.chainId,
     }
   });
 
@@ -176,10 +177,13 @@ export const useGameLogic = (isSdkReady: boolean, activeSeason: Season) => {
 
   // Main initialization effect. This is the orchestrator for loading games when the season changes.
   useEffect(() => {
-    if (!isSdkReady) {
-      console.log(`[MainEffect] Skip: SDK not ready for season '${activeSeason}'.`);
+    // RACE CONDITION FIX: Do not proceed until the SDK is ready AND the wagmi connection is stable.
+    if (!isSdkReady || wagmiStatus !== 'connected') {
+      console.log(`[MainEffect] Skip: Waiting for dependencies. SDK Ready: ${isSdkReady}, Wagmi Status: ${wagmiStatus}`);
+      setIsInitializing(true); // Ensure we show loading state
       return;
     }
+
 
     console.log(`[MainEffect] START for season: ${activeSeason}`);
     seasonTransitionRef.current = true; // Set flag to block saving during transition
@@ -277,7 +281,7 @@ export const useGameLogic = (isSdkReady: boolean, activeSeason: Season) => {
     };
 
     initializeGameForSeason();
-  }, [isSdkReady, activeSeason]);
+  }, [isSdkReady, activeSeason, wagmiStatus]);
   
   // Game state saving effect
   useEffect(() => {
