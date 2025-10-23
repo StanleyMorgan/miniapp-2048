@@ -121,38 +121,50 @@ export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const season = searchParams.get('season') as Season | null;
 
+  console.log(`[onchain-leaderboard] Received request for season: ${season}`);
+
   if (!season || !onChainSeasonConfigs.hasOwnProperty(season)) {
+    console.error(`[onchain-leaderboard] Invalid or missing season parameter.`);
     return new Response(JSON.stringify({ message: 'Missing or invalid season' }), { status: 400 });
   }
 
   const seasonConfig: OnChainSeasonConfig = onChainSeasonConfigs[season as keyof typeof onChainSeasonConfigs];
+  console.log('[onchain-leaderboard] Found season config:', { address: seasonConfig.address, chainId: seasonConfig.chainId });
+
   const chain = chainMap[seasonConfig.chainId];
   if (!chain) {
+      console.error(`[onchain-leaderboard] Configuration error: Chain with ID ${seasonConfig.chainId} not found in chainMap.`);
       return new Response(JSON.stringify({ message: `Configuration error: Chain with ID ${seasonConfig.chainId} not found.` }), { status: 500 });
   }
+  console.log(`[onchain-leaderboard] Mapped to chain: ${chain.name}`);
 
   try {
     const publicClient = createPublicClient({
       chain: chain,
       transport: http(),
     });
+    console.log('[onchain-leaderboard] Public VIEM client created.');
 
+    console.log('[onchain-leaderboard] Attempting to read contract and get current user...');
+    // FIX: Removed the `args: []` property from the `readContract` call. For contract functions that take no arguments,
+    // recent versions of viem expect the `args` property to be omitted entirely. Including it
+    // can cause type inference issues, leading to the "authorizationList is missing" error.
     const [rawLeaderboard, currentUserAddress] = await Promise.all([
         publicClient.readContract({
             address: seasonConfig.address,
             abi: seasonConfig.abi,
             functionName: 'getLeaderboard',
-            // FIX: Explicitly pass an empty args array for functions with no inputs.
-            // This can help resolve type inference issues in some versions of viem.
-            args: [],
         }) as Promise<RawLeaderboardEntry[]>,
         getCurrentUserPrimaryAddress(request)
     ]);
+    console.log(`[onchain-leaderboard] Successfully read from contract. Raw data length: ${rawLeaderboard?.length ?? 'N/A'}`);
     
     if (!rawLeaderboard || !Array.isArray(rawLeaderboard)) {
+        console.error('[onchain-leaderboard] Invalid data received from smart contract. Expected an array.');
         throw new Error("Invalid data received from smart contract.");
     }
     
+    console.log('[onchain-leaderboard] Enriching leaderboard data with Farcaster profiles...');
     const enrichedDataPromises = rawLeaderboard.map(async (entry) => {
         const farcasterUser = await getFarcasterUser(entry.player);
         return {
@@ -163,6 +175,7 @@ export async function GET(request: Request) {
     });
 
     const enrichedLeaderboard = await Promise.all(enrichedDataPromises);
+    console.log('[onchain-leaderboard] Data enrichment complete.');
 
     const sortedLeaderboard = enrichedLeaderboard
       .sort((a, b) => b.score - a.score)
@@ -170,6 +183,7 @@ export async function GET(request: Request) {
           ...entry,
           rank: index + 1,
       }));
+    console.log('[onchain-leaderboard] Leaderboard sorted. Sending response.');
 
     return new Response(JSON.stringify(sortedLeaderboard), {
       status: 200,
@@ -180,7 +194,7 @@ export async function GET(request: Request) {
     });
 
   } catch (error) {
-    console.error(`[onchain-leaderboard] Error for season ${season}:`, error);
+    console.error(`[onchain-leaderboard] FATAL ERROR for season ${season}:`, error);
     const errorResponse = { message: 'Error fetching on-chain leaderboard.' };
     return new Response(JSON.stringify(errorResponse), {
       status: 500,
