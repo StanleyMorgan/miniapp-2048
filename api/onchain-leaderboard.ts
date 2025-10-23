@@ -1,4 +1,4 @@
-import { createPublicClient, http, defineChain } from 'viem';
+import { createPublicClient, http, defineChain, getContract } from 'viem';
 // FIX: Added .js extension, which is mandatory for module resolution in Vercel's Node.js environment.
 import { onChainSeasonConfigs } from '../constants/contract.js';
 import { createClient, Errors } from '@farcaster/quick-auth';
@@ -81,17 +81,14 @@ export async function GET(request: Request) {
     const domain = host;
     
     try {
-      // Custom interface to handle the optional `primaryAddress` which might be in the payload.
       interface CustomJWTPayload {
         sub: number;
-        primaryAddress?: string;
         [key: string]: unknown;
       }
 
       const payload = (await quickAuthClient.verifyJwt({ token, domain })) as CustomJWTPayload;
       const fid = payload.sub;
 
-      // Fetch primary address for the authenticated FID, as it's more reliable than the JWT payload.
       const addressResponse = await fetch(`https://api.farcaster.xyz/fc/primary-address?fid=${fid}&protocol=ethereum`);
       if (addressResponse.ok) {
         const addressData = await addressResponse.json();
@@ -123,50 +120,66 @@ export async function GET(request: Request) {
     console.log('[onchain-leaderboard] Public VIEM client created.');
     console.log('[onchain-leaderboard] Attempting to read contract...');
 
-    // FIX: Removed the `args: []` property. For functions with no arguments, viem's
-    // type system expects the `args` property to be omitted, which resolves the type error.
-    const leaderboardData = await client.readContract({
+    // FIX: Use `getContract` to create a typed contract instance. This avoids a potential
+    // type inference issue with `client.readContract` that was causing a build error.
+    const leaderboardContract = getContract({
       address: seasonConfig.address,
       abi: seasonConfig.abi,
-      functionName: 'getLeaderboard',
+      client,
     });
-    console.log(`[onchain-leaderboard] Successfully read from contract. Raw data length: ${leaderboardData.length}`);
-    console.log('[onchain-leaderboard] Enriching leaderboard data with Farcaster profiles via batch request...');
 
-    // --- BATCH ENRICHMENT LOGIC ---
+    const leaderboardData = await leaderboardContract.read.getLeaderboard();
+
+    console.log(`[onchain-leaderboard] Successfully read from contract. Raw data length: ${leaderboardData.length}`);
+    console.log('[onchain-leaderboard] Enriching leaderboard data with Farcaster profiles via Neynar API...');
+
+    // --- NEYNAR BATCH ENRICHMENT LOGIC ---
+    const neynarApiKey = process.env.NEYNAR_API_KEY;
+    if (!neynarApiKey) {
+      console.error('[Enrichment] NEYNAR_API_KEY is not set. Cannot fetch user profiles.');
+      return new Response(JSON.stringify({ message: 'Server configuration error: NEYNAR_API_KEY is missing.' }), {
+        status: 500,
+        headers: { 'Content-Type': 'application/json' },
+      });
+    }
+
     const addresses = leaderboardData.map(entry => entry.player);
     const userProfileMap = new Map<string, { displayName: string; fid: number }>();
 
     if (addresses.length > 0) {
       try {
         const addressesString = addresses.join(',');
-        // Correct, plural endpoint for batch fetching
-        const userResponse = await fetch(`https://api.warpcast.com/v2/users-by-verified-address?addresses=${addressesString}`);
-        console.log(`[Enrichment] Batch API response status: ${userResponse.status}`);
+        const neynarUrl = `https://api.neynar.com/v2/farcaster/user/bulk-by-address?addresses=${addressesString}`;
+
+        const userResponse = await fetch(neynarUrl, {
+          headers: {
+            'accept': 'application/json',
+            'api_key': neynarApiKey,
+          },
+        });
+        
+        console.log(`[Enrichment] Neynar API response status: ${userResponse.status}`);
 
         if (userResponse.ok) {
           const userData = await userResponse.json();
-          // The response format is { result: { usersByVerifiedAddress: { "0x...": [user], ... } } }
-          if (userData.result && userData.result.usersByVerifiedAddress) {
-            const usersByAddress = userData.result.usersByVerifiedAddress;
-            for (const address in usersByAddress) {
-              const userArray = usersByAddress[address];
-              if (userArray && userArray.length > 0) {
-                const user = userArray[0];
-                userProfileMap.set(address.toLowerCase(), {
-                  displayName: user.displayName,
-                  fid: user.fid,
-                });
-                 console.log(`[Enrichment] Found profile for ${address}: ${user.displayName}`);
-              }
+          // The response format is { "0x...": [user], ... }
+          for (const address in userData) {
+            const userArray = userData[address];
+            if (userArray && userArray.length > 0) {
+              const user = userArray[0];
+              userProfileMap.set(address.toLowerCase(), {
+                displayName: user.display_name, // Correct property is display_name
+                fid: user.fid,
+              });
+              console.log(`[Enrichment] Found profile for ${address}: ${user.display_name}`);
             }
           }
         } else {
             const errorBody = await userResponse.text();
-            console.warn(`[Enrichment] Batch API call failed. Status: ${userResponse.status}, Body: ${errorBody}`);
+            console.warn(`[Enrichment] Neynar API call failed. Status: ${userResponse.status}, Body: ${errorBody}`);
         }
       } catch (fetchError) {
-        console.error(`[Enrichment] Batch fetch error:`, fetchError);
+        console.error(`[Enrichment] Neynar fetch error:`, fetchError);
       }
     }
 
