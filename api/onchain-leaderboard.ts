@@ -83,26 +83,20 @@ export async function GET(request: Request) {
     try {
       // Custom interface to handle the optional `primaryAddress` which might be in the payload.
       interface CustomJWTPayload {
-        // FIX: The `sub` property (FID) from the JWT payload is a number, not a string.
         sub: number;
-        primaryAddress?: string; // Add the optional property
-        [key: string]: unknown; // Allow other properties
+        primaryAddress?: string;
+        [key: string]: unknown;
       }
 
       const payload = (await quickAuthClient.verifyJwt({ token, domain })) as CustomJWTPayload;
-      
-      // Prioritize primaryAddress from JWT if available, otherwise fetch it.
-      if (payload.primaryAddress) {
-        currentUserAddress = payload.primaryAddress.toLowerCase();
-      } else {
-        const fid = payload.sub;
-        // Fetch primary address for the authenticated FID
-        const addressResponse = await fetch(`https://api.farcaster.xyz/fc/primary-address?fid=${fid}&protocol=ethereum`);
-        if (addressResponse.ok) {
-          const addressData = await addressResponse.json();
-          if (addressData?.result?.address?.address) {
-            currentUserAddress = addressData.result.address.address.toLowerCase();
-          }
+      const fid = payload.sub;
+
+      // Fetch primary address for the authenticated FID, as it's more reliable than the JWT payload.
+      const addressResponse = await fetch(`https://api.farcaster.xyz/fc/primary-address?fid=${fid}&protocol=ethereum`);
+      if (addressResponse.ok) {
+        const addressData = await addressResponse.json();
+        if (addressData?.result?.address?.address) {
+          currentUserAddress = addressData.result.address.address.toLowerCase();
         }
       }
       console.log(`[onchain-leaderboard] Authenticated user address: ${currentUserAddress}`);
@@ -129,61 +123,68 @@ export async function GET(request: Request) {
     console.log('[onchain-leaderboard] Public VIEM client created.');
     console.log('[onchain-leaderboard] Attempting to read contract...');
 
-    // FIX: Explicitly provide an empty args array for functions with no arguments.
-    // This helps TypeScript select the correct overload for readContract and avoids type errors.
+    // FIX: Removed the `args: []` property. For functions with no arguments, viem's
+    // type system expects the `args` property to be omitted, which resolves the type error.
     const leaderboardData = await client.readContract({
       address: seasonConfig.address,
       abi: seasonConfig.abi,
       functionName: 'getLeaderboard',
-      args: [],
     });
     console.log(`[onchain-leaderboard] Successfully read from contract. Raw data length: ${leaderboardData.length}`);
-    console.log('[onchain-leaderboard] Enriching leaderboard data with Farcaster profiles...');
+    console.log('[onchain-leaderboard] Enriching leaderboard data with Farcaster profiles via batch request...');
 
-    const enrichedLeaderboard = await Promise.all(
-      leaderboardData.map(async (entry, index) => {
-        const address = entry.player;
-        let displayName = formatAddress(address);
-        let fid: number | null = null;
-        
-        console.log(`[Enrichment] Processing address: ${address}`);
+    // --- BATCH ENRICHMENT LOGIC ---
+    const addresses = leaderboardData.map(entry => entry.player);
+    const userProfileMap = new Map<string, { displayName: string; fid: number }>();
 
-        try {
-          // Use Warpcast's reliable API to find user by any verified address
-          const userResponse = await fetch(`https://api.warpcast.com/v2/user-by-verified-address?address=${address}`);
-          console.log(`[Enrichment] API response status for ${address}: ${userResponse.status}`);
+    if (addresses.length > 0) {
+      try {
+        const addressesString = addresses.join(',');
+        // Correct, plural endpoint for batch fetching
+        const userResponse = await fetch(`https://api.warpcast.com/v2/users-by-verified-address?addresses=${addressesString}`);
+        console.log(`[Enrichment] Batch API response status: ${userResponse.status}`);
 
-          if (userResponse.ok) {
-            const userData = await userResponse.json();
-            if (userData.result && userData.result.user) {
-              displayName = userData.result.user.displayName;
-              fid = userData.result.user.fid;
-              console.log(`[Enrichment] Found user for ${address}: ${displayName} (FID: ${fid})`);
-            } else {
-              console.log(`[Enrichment] User not found in API response for ${address}.`);
+        if (userResponse.ok) {
+          const userData = await userResponse.json();
+          // The response format is { result: { usersByVerifiedAddress: { "0x...": [user], ... } } }
+          if (userData.result && userData.result.usersByVerifiedAddress) {
+            const usersByAddress = userData.result.usersByVerifiedAddress;
+            for (const address in usersByAddress) {
+              const userArray = usersByAddress[address];
+              if (userArray && userArray.length > 0) {
+                const user = userArray[0];
+                userProfileMap.set(address.toLowerCase(), {
+                  displayName: user.displayName,
+                  fid: user.fid,
+                });
+                 console.log(`[Enrichment] Found profile for ${address}: ${user.displayName}`);
+              }
             }
-          } else {
-             const errorBody = await userResponse.text();
-             console.warn(`[Enrichment] API call failed for ${address}. Status: ${userResponse.status}, Body: ${errorBody}`);
           }
-        } catch (fetchError) {
-          console.error(`[Enrichment] Fetch error for address ${address}:`, fetchError);
+        } else {
+            const errorBody = await userResponse.text();
+            console.warn(`[Enrichment] Batch API call failed. Status: ${userResponse.status}, Body: ${errorBody}`);
         }
+      } catch (fetchError) {
+        console.error(`[Enrichment] Batch fetch error:`, fetchError);
+      }
+    }
+
+    const enrichedLeaderboard = leaderboardData.map(entry => {
+        const address = entry.player.toLowerCase();
+        const profile = userProfileMap.get(address);
 
         return {
-          rank: index + 1,
-          displayName,
-          fid,
+          rank: 0, // Will be set after sorting
+          displayName: profile ? profile.displayName : formatAddress(entry.player),
+          fid: profile ? profile.fid : null,
           score: Number(entry.score),
-          isCurrentUser: !!currentUserAddress && address.toLowerCase() === currentUserAddress,
+          isCurrentUser: !!currentUserAddress && address === currentUserAddress,
         };
-      })
-    );
+    });
     console.log('[onchain-leaderboard] Data enrichment complete.');
     
-    // Sort the final result to ensure the current user (if not in top results) is placed correctly.
     enrichedLeaderboard.sort((a, b) => b.score - a.score);
-    // Re-assign ranks after sorting
     const finalLeaderboard = enrichedLeaderboard.map((entry, index) => ({ ...entry, rank: index + 1 }));
 
     console.log('[onchain-leaderboard] Leaderboard sorted. Sending response.');
