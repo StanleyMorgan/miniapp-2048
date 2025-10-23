@@ -1,16 +1,10 @@
-// api/onchain-leaderboard.ts
+import { createPublicClient, http, defineChain } from 'viem';
+import { onChainSeasonConfigs, LEADERBOARD_ABI } from '../../constants/contract';
+import { createClient, Errors } from '@farcaster/quick-auth';
 
 export const dynamic = 'force-dynamic';
-export const revalidate = 60; // Cache for 60 seconds
 
-import { createPublicClient, http, defineChain } from 'viem';
-import { base, celo } from 'viem/chains';
-import { onChainSeasonConfigs, OnChainSeasonConfig } from '../constants/contract.js';
-// FIX: Import JWTPayload to extend it for custom claims.
-import { createClient, Errors, type JWTPayload } from '@farcaster/quick-auth';
-import type { Season } from '../components/SeasonSelector';
-
-// --- Chain Definitions (ensure they are available server-side) ---
+// Define chains for viem client, mirroring wagmiConfig.ts
 const monad = defineChain({
   id: 10143,
   name: 'Monad Testnet',
@@ -20,12 +14,29 @@ const monad = defineChain({
   },
 });
 
-const chainMap = {
+const base = defineChain({
+  id: 8453,
+  name: 'Base',
+  nativeCurrency: { name: 'Ether', symbol: 'ETH', decimals: 18 },
+  rpcUrls: {
+    default: { http: ['https://mainnet.base.org'] },
+  },
+});
+
+const celo = defineChain({
+  id: 42220,
+  name: 'Celo',
+  nativeCurrency: { name: 'Celo', symbol: 'CELO', decimals: 18 },
+  rpcUrls: {
+    default: { http: ['https://forno.celo.org'] },
+  },
+});
+
+const chains: { [key: number]: any } = {
   [monad.id]: monad,
   [base.id]: base,
   [celo.id]: celo,
 };
-// --- End of Chain Definitions ---
 
 type LeaderboardEntry = {
   rank: number;
@@ -35,171 +46,89 @@ type LeaderboardEntry = {
   isCurrentUser?: boolean;
 };
 
-type RawLeaderboardEntry = {
-  player: `0x${string}`;
-  score: bigint;
-};
-
-// FIX: Define a custom interface for the JWT payload to include the optional primaryAddress.
-interface CustomJWTPayload extends JWTPayload {
-  primaryAddress?: string;
-}
-
-// Cache for Farcaster user data to reduce API calls
-const userCache = new Map<string, { data: { displayName: string; fid: number | null }, timestamp: number }>();
-const CACHE_TTL = 5 * 60 * 1000; // 5 minutes
-
-async function getFarcasterUser(address: string): Promise<{ displayName: string; fid: number | null }> {
-  const cachedEntry = userCache.get(address.toLowerCase());
-  if (cachedEntry && (Date.now() - cachedEntry.timestamp < CACHE_TTL)) {
-    return cachedEntry.data;
-  }
-
-  try {
-    // Using the fnames API which is better at resolving any verified address to a username.
-    const response = await fetch(`https://fnames.farcaster.xyz/transfers/current?address=${address}`);
-    if (response.ok) {
-      const data = await response.json();
-      // The API returns an array of transfers, we want the most recent one's username.
-      if (data.transfers && data.transfers.length > 0) {
-        const username = data.transfers[0].username;
-        const fid = data.transfers[0].to; // The 'to' field is the FID
-        const result = {
-          displayName: username, // Use the fname as the display name
-          fid: fid ? Number(fid) : null,
-        };
-        userCache.set(address.toLowerCase(), { data: result, timestamp: Date.now() });
-        return result;
-      }
-    }
-  } catch (error) {
-    console.warn(`[onchain-leaderboard] Failed to fetch Farcaster fname for address ${address}:`, error);
-  }
-
-  // Fallback for addresses not on Farcaster or if API fails
-  return {
-    displayName: `${address.slice(0, 6)}...${address.slice(-4)}`,
-    fid: null
-  };
-}
-
-
-async function getCurrentUserPrimaryAddress(request: Request): Promise<string | null> {
-    const quickAuthClient = createClient();
-    const authorization = request.headers.get('Authorization');
-    if (!authorization || !authorization.startsWith('Bearer ')) return null;
-
-    const token = authorization.split(' ')[1];
-    const host = request.headers.get('Host');
-    if (!host) return null;
-
-    try {
-        // FIX: Use the custom payload type to safely access primaryAddress.
-        const payload = await quickAuthClient.verifyJwt({ token, domain: host }) as CustomJWTPayload;
-        // The quick-auth JWT payload itself might contain the primary address.
-        if (payload.primaryAddress) {
-            return payload.primaryAddress;
-        }
-        
-        // Fallback to fetching it if not in JWT
-        const fid = Number(payload.sub);
-        const addressResponse = await fetch(`https://api.farcaster.xyz/fc/primary-address?fid=${fid}&protocol=ethereum`);
-        if (addressResponse.ok) {
-            const addressData = await addressResponse.json();
-            if (addressData?.result?.address?.address) {
-                return addressData.result.address.address;
-            }
-        }
-    } catch (e) {
-        if (e instanceof Errors.InvalidTokenError) {
-            console.warn(`[onchain-leaderboard] Invalid token error while getting user address.`);
-        } else {
-            console.error(`[onchain-leaderboard] Unexpected error verifying JWT:`, e);
-        }
-    }
-    return null;
-}
-
+// Helper to format address for display
+const formatAddress = (address: string) => `${address.slice(0, 6)}...${address.slice(-4)}`;
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
-  const season = searchParams.get('season') as Season | null;
+  const season = searchParams.get('season') as keyof typeof onChainSeasonConfigs | null;
 
-  console.log(`[onchain-leaderboard] Received request for season: ${season}`);
-
-  if (!season || !onChainSeasonConfigs.hasOwnProperty(season)) {
-    console.error(`[onchain-leaderboard] Invalid or missing season parameter.`);
-    return new Response(JSON.stringify({ message: 'Missing or invalid season' }), { status: 400 });
+  if (!season || !onChainSeasonConfigs[season]) {
+    return new Response(JSON.stringify({ message: 'Invalid or missing season parameter' }), {
+      status: 400,
+      headers: { 'Content-Type': 'application/json' },
+    });
   }
 
-  const seasonConfig: OnChainSeasonConfig = onChainSeasonConfigs[season as keyof typeof onChainSeasonConfigs];
-  console.log('[onchain-leaderboard] Found season config:', { address: seasonConfig.address, chainId: seasonConfig.chainId });
+  const seasonConfig = onChainSeasonConfigs[season];
 
-  const chain = chainMap[seasonConfig.chainId];
-  if (!chain) {
-      console.error(`[onchain-leaderboard] Configuration error: Chain with ID ${seasonConfig.chainId} not found in chainMap.`);
-      return new Response(JSON.stringify({ message: `Configuration error: Chain with ID ${seasonConfig.chainId} not found.` }), { status: 500 });
+  // --- Handle Authentication to identify current user ---
+  const quickAuthClient = createClient();
+  const authorization = request.headers.get('Authorization');
+  let currentUserAddress: string | null = null;
+
+  if (authorization && authorization.startsWith('Bearer ')) {
+    const token = authorization.split(' ')[1];
+    const host = request.headers.get('Host');
+    if (!host) {
+      return new Response(JSON.stringify({ message: 'Bad Request: Missing Host header' }), { status: 400 });
+    }
+    const domain = host;
+    
+    try {
+      const payload = await quickAuthClient.verifyJwt({ token, domain });
+      const fid = Number(payload.sub);
+      // Fetch primary address for the authenticated FID
+      const addressResponse = await fetch(`https://api.farcaster.xyz/fc/primary-address?fid=${fid}&protocol=ethereum`);
+      if (addressResponse.ok) {
+        const addressData = await addressResponse.json();
+        if (addressData?.result?.address?.address) {
+          currentUserAddress = addressData.result.address.address.toLowerCase();
+        }
+      }
+    } catch (e) {
+      if (e instanceof Errors.InvalidTokenError) {
+        console.warn(`[onchain-leaderboard] Invalid token for domain "${domain}".`);
+      } else {
+        console.error(`[onchain-leaderboard] Error verifying JWT for domain "${domain}":`, e);
+      }
+    }
   }
-  console.log(`[onchain-leaderboard] Mapped to chain: ${chain.name}`);
 
   try {
-    const publicClient = createPublicClient({
+    const chain = chains[seasonConfig.chainId];
+    if (!chain) {
+      throw new Error(`Chain configuration not found for chainId: ${seasonConfig.chainId}`);
+    }
+
+    const client = createPublicClient({
       chain: chain,
       transport: http(),
     });
-    console.log('[onchain-leaderboard] Public VIEM client created.');
 
-    console.log('[onchain-leaderboard] Attempting to read contract and get current user...');
-    // FIX: The `args` property must be omitted for contract functions that take no arguments.
-    // Some versions of viem have type inference issues when `args` is passed (even as an empty array),
-    // leading to it expecting transaction-related properties like `authorizationList`.
-    const [rawLeaderboard, currentUserAddress] = await Promise.all([
-        publicClient.readContract({
-            address: seasonConfig.address,
-            abi: seasonConfig.abi,
-            functionName: 'getLeaderboard',
-        }) as Promise<RawLeaderboardEntry[]>,
-        getCurrentUserPrimaryAddress(request)
-    ]);
-    console.log(`[onchain-leaderboard] Successfully read from contract. Raw data length: ${rawLeaderboard?.length ?? 'N/A'}`);
-    
-    if (!rawLeaderboard || !Array.isArray(rawLeaderboard)) {
-        console.error('[onchain-leaderboard] Invalid data received from smart contract. Expected an array.');
-        throw new Error("Invalid data received from smart contract.");
-    }
-    
-    console.log('[onchain-leaderboard] Enriching leaderboard data with Farcaster profiles...');
-    const enrichedDataPromises = rawLeaderboard.map(async (entry) => {
-        const farcasterUser = await getFarcasterUser(entry.player);
-        return {
-            ...farcasterUser,
-            score: Number(entry.score),
-            isCurrentUser: !!currentUserAddress && currentUserAddress.toLowerCase() === entry.player.toLowerCase(),
-        };
+    const leaderboardData = await client.readContract({
+      address: seasonConfig.address,
+      abi: LEADERBOARD_ABI,
+      functionName: 'getLeaderboard',
     });
 
-    const enrichedLeaderboard = await Promise.all(enrichedDataPromises);
-    console.log('[onchain-leaderboard] Data enrichment complete.');
+    // The contract returns players sorted by score, so rank is their index + 1
+    const leaderboard: LeaderboardEntry[] = leaderboardData.map((entry, index) => ({
+      rank: index + 1,
+      displayName: formatAddress(entry.player),
+      fid: null, // We don't have FID from on-chain data without an indexer
+      score: Number(entry.score),
+      isCurrentUser: !!currentUserAddress && entry.player.toLowerCase() === currentUserAddress,
+    }));
 
-    const sortedLeaderboard = enrichedLeaderboard
-      .sort((a, b) => b.score - a.score)
-      .map((entry, index) => ({
-          ...entry,
-          rank: index + 1,
-      }));
-    console.log('[onchain-leaderboard] Leaderboard sorted. Sending response.');
-
-    return new Response(JSON.stringify(sortedLeaderboard), {
+    return new Response(JSON.stringify(leaderboard), {
       status: 200,
-      headers: { 
-        'Content-Type': 'application/json',
-        'Cache-Control': `public, s-maxage=60, stale-while-revalidate=120`
-      },
+      headers: { 'Content-Type': 'application/json' },
     });
 
   } catch (error) {
-    console.error(`[onchain-leaderboard] FATAL ERROR for season ${season}:`, error);
-    const errorResponse = { message: 'Error fetching on-chain leaderboard.' };
+    console.error(`[onchain-leaderboard] Error fetching on-chain leaderboard for season ${season}:`, error);
+    const errorResponse = { message: 'Error fetching leaderboard data from the blockchain.' };
     return new Response(JSON.stringify(errorResponse), {
       status: 500,
       headers: { 'Content-Type': 'application/json' },
