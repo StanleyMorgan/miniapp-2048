@@ -1,5 +1,6 @@
 import { createPublicClient, http, defineChain } from 'viem';
-import { onChainSeasonConfigs, LEADERBOARD_ABI } from '../../constants/contract';
+// FIX: Removed .js extension to allow TypeScript to correctly resolve the module and its types.
+import { onChainSeasonConfigs } from '../constants/contract';
 import { createClient, Errors } from '@farcaster/quick-auth';
 
 export const dynamic = 'force-dynamic';
@@ -108,7 +109,8 @@ export async function GET(request: Request) {
 
     const leaderboardData = await client.readContract({
       address: seasonConfig.address,
-      abi: LEADERBOARD_ABI,
+      // FIX: Use the strongly-typed ABI from the seasonConfig object.
+      abi: seasonConfig.abi,
       functionName: 'getLeaderboard',
     });
 
