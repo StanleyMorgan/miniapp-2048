@@ -354,6 +354,8 @@ export const useGameLogic = (isSdkReady: boolean, activeSeason: Season) => {
 
         const packedBoard = packBoard(tiles);
         const endTime = Date.now();
+        // FIX: Add `as const` to ensure TypeScript infers a tuple type, not an array type.
+        // This is required by wagmi/viem for type-safe contract calls.
         const args = [
             BigInt(packedBoard),
             BigInt(score),
@@ -362,7 +364,7 @@ export const useGameLogic = (isSdkReady: boolean, activeSeason: Season) => {
             ('0x' + seed) as `0x${string}`,
             ('0x' + randomness) as `0x${string}`,
             finalMovesHash as `0x${string}`
-        ];
+        ] as const;
         
         console.log(`[ONCHAIN] Preparing to submit score to ${activeSeasonConfig.address} on chain ${activeSeasonConfig.chainId}.`);
         console.log('[ONCHAIN] Submission args:', {

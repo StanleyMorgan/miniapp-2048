@@ -6,7 +6,8 @@ export const revalidate = 60; // Cache for 60 seconds
 import { createPublicClient, http, defineChain } from 'viem';
 import { base, celo } from 'viem/chains';
 import { onChainSeasonConfigs, OnChainSeasonConfig } from '../constants/contract';
-import { createClient, Errors } from '@farcaster/quick-auth';
+// FIX: Import JWTPayload to extend it for custom claims.
+import { createClient, Errors, type JWTPayload } from '@farcaster/quick-auth';
 import type { Season } from '../components/SeasonSelector';
 
 // --- Chain Definitions (ensure they are available server-side) ---
@@ -38,6 +39,11 @@ type RawLeaderboardEntry = {
   player: `0x${string}`;
   score: bigint;
 };
+
+// FIX: Define a custom interface for the JWT payload to include the optional primaryAddress.
+interface CustomJWTPayload extends JWTPayload {
+  primaryAddress?: string;
+}
 
 // Cache for Farcaster user data to reduce API calls
 const userCache = new Map<string, { data: { displayName: string; fid: number | null }, timestamp: number }>();
@@ -84,7 +90,8 @@ async function getCurrentUserPrimaryAddress(request: Request): Promise<string | 
     if (!host) return null;
 
     try {
-        const payload = await quickAuthClient.verifyJwt({ token, domain: host });
+        // FIX: Use the custom payload type to safely access primaryAddress.
+        const payload = await quickAuthClient.verifyJwt({ token, domain: host }) as CustomJWTPayload;
         // The quick-auth JWT payload itself might contain the primary address.
         if (payload.primaryAddress) {
             return payload.primaryAddress;
@@ -135,6 +142,9 @@ export async function GET(request: Request) {
             address: seasonConfig.address,
             abi: seasonConfig.abi,
             functionName: 'getLeaderboard',
+            // FIX: Explicitly pass an empty args array for functions with no inputs.
+            // This can help resolve type inference issues in some versions of viem.
+            args: [],
         }) as Promise<RawLeaderboardEntry[]>,
         getCurrentUserPrimaryAddress(request)
     ]);

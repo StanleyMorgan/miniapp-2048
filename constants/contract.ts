@@ -1,19 +1,16 @@
-
-
-
 // --- MONAD S0 CONTRACT DETAILS ---
 // The contract address is now loaded from a Vite environment variable.
 // Create a .env.local file in your project root and add:
 // VITE_MONAD_CONTRACT_ADDRESS=0xYourContractAddressHere
-export const MONAD_LEADERBOARD_ADDRESS = (import.meta as any).env.VITE_MONAD_CONTRACT_ADDRESS as `0x${string}`;
+export const MONAD_LEADERBOARD_ADDRESS = ((import.meta as any).env?.VITE_MONAD_CONTRACT_ADDRESS || process.env.VITE_MONAD_CONTRACT_ADDRESS) as `0x${string}`;
 
 // --- BASE S0 CONTRACT DETAILS ---
 // VITE_BASE_CONTRACT_ADDRESS=0x3a51F8B9d3489d0A6eDccf88565bFC9594129fd7
-export const BASE_LEADERBOARD_ADDRESS = (import.meta as any).env.VITE_BASE_CONTRACT_ADDRESS as `0x${string}`;
+export const BASE_LEADERBOARD_ADDRESS = ((import.meta as any).env?.VITE_BASE_CONTRACT_ADDRESS || process.env.VITE_BASE_CONTRACT_ADDRESS) as `0x${string}`;
 
 // --- CELO S0 CONTRACT DETAILS ---
 // VITE_CELO_CONTRACT_ADDRESS=0x7aD03C587f63165d4119D912D112E3a060694f78
-export const CELO_LEADERBOARD_ADDRESS = (import.meta as any).env.VITE_CELO_CONTRACT_ADDRESS as `0x${string}`;
+export const CELO_LEADERBOARD_ADDRESS = ((import.meta as any).env?.VITE_CELO_CONTRACT_ADDRESS || process.env.VITE_CELO_CONTRACT_ADDRESS) as `0x${string}`;
 
 // --- SHARED LEADERBOARD ABI ---
 // This ABI is assumed to be the same for Monad, Base, and Celo leaderboards.
