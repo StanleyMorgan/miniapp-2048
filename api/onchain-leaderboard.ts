@@ -1,6 +1,6 @@
 import { createPublicClient, http, defineChain } from 'viem';
-// FIX: Removed .js extension to allow TypeScript to correctly resolve the module and its types.
-import { onChainSeasonConfigs } from '../constants/contract';
+// FIX: Added .js extension, which is mandatory for module resolution in Vercel's Node.js environment.
+import { onChainSeasonConfigs } from '../constants/contract.js';
 import { createClient, Errors } from '@farcaster/quick-auth';
 
 export const dynamic = 'force-dynamic';
@@ -77,14 +77,28 @@ export async function GET(request: Request) {
     const domain = host;
     
     try {
-      const payload = await quickAuthClient.verifyJwt({ token, domain });
-      const fid = Number(payload.sub);
-      // Fetch primary address for the authenticated FID
-      const addressResponse = await fetch(`https://api.farcaster.xyz/fc/primary-address?fid=${fid}&protocol=ethereum`);
-      if (addressResponse.ok) {
-        const addressData = await addressResponse.json();
-        if (addressData?.result?.address?.address) {
-          currentUserAddress = addressData.result.address.address.toLowerCase();
+      // Custom interface to handle the optional `primaryAddress` which might be in the payload.
+      interface CustomJWTPayload {
+        // FIX: The `sub` property (FID) from the JWT payload is a number, not a string.
+        sub: number;
+        primaryAddress?: string; // Add the optional property
+        [key: string]: unknown; // Allow other properties
+      }
+
+      const payload = (await quickAuthClient.verifyJwt({ token, domain })) as CustomJWTPayload;
+      
+      // Prioritize primaryAddress from JWT if available, otherwise fetch it.
+      if (payload.primaryAddress) {
+        currentUserAddress = payload.primaryAddress.toLowerCase();
+      } else {
+        const fid = payload.sub;
+        // Fetch primary address for the authenticated FID
+        const addressResponse = await fetch(`https://api.farcaster.xyz/fc/primary-address?fid=${fid}&protocol=ethereum`);
+        if (addressResponse.ok) {
+          const addressData = await addressResponse.json();
+          if (addressData?.result?.address?.address) {
+            currentUserAddress = addressData.result.address.address.toLowerCase();
+          }
         }
       }
     } catch (e) {
@@ -107,23 +121,49 @@ export async function GET(request: Request) {
       transport: http(),
     });
 
+    // FIX: The previous fix of adding `args: []` seems to cause a type error.
+    // Omitting `args` for contract functions that take no arguments is the standard approach.
     const leaderboardData = await client.readContract({
       address: seasonConfig.address,
-      // FIX: Use the strongly-typed ABI from the seasonConfig object.
       abi: seasonConfig.abi,
       functionName: 'getLeaderboard',
     });
 
-    // The contract returns players sorted by score, so rank is their index + 1
-    const leaderboard: LeaderboardEntry[] = leaderboardData.map((entry, index) => ({
-      rank: index + 1,
-      displayName: formatAddress(entry.player),
-      fid: null, // We don't have FID from on-chain data without an indexer
-      score: Number(entry.score),
-      isCurrentUser: !!currentUserAddress && entry.player.toLowerCase() === currentUserAddress,
-    }));
+    const enrichedLeaderboard = await Promise.all(
+      leaderboardData.map(async (entry, index) => {
+        let displayName = formatAddress(entry.player);
+        let fid: number | null = null;
 
-    return new Response(JSON.stringify(leaderboard), {
+        try {
+          // Use Warpcast's reliable API to find user by any verified address
+          const userResponse = await fetch(`https://api.warpcast.com/v2/user-by-verified-address?address=${entry.player}`);
+          if (userResponse.ok) {
+            const userData = await userResponse.json();
+            if (userData.result && userData.result.user) {
+              displayName = userData.result.user.displayName;
+              fid = userData.result.user.fid;
+            }
+          }
+        } catch (fetchError) {
+          console.warn(`[onchain-leaderboard] Could not fetch Farcaster profile for address ${entry.player}:`, fetchError);
+        }
+
+        return {
+          rank: index + 1,
+          displayName,
+          fid,
+          score: Number(entry.score),
+          isCurrentUser: !!currentUserAddress && entry.player.toLowerCase() === currentUserAddress,
+        };
+      })
+    );
+    
+    // Sort the final result to ensure the current user (if not in top results) is placed correctly.
+    enrichedLeaderboard.sort((a, b) => b.score - a.score);
+    // Re-assign ranks after sorting
+    const finalLeaderboard = enrichedLeaderboard.map((entry, index) => ({ ...entry, rank: index + 1 }));
+
+    return new Response(JSON.stringify(finalLeaderboard), {
       status: 200,
       headers: { 'Content-Type': 'application/json' },
     });
