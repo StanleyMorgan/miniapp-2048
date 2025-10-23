@@ -1,4 +1,4 @@
-import { createPublicClient, http, defineChain, getContract } from 'viem';
+import { createPublicClient, http, defineChain } from 'viem';
 // FIX: Added .js extension, which is mandatory for module resolution in Vercel's Node.js environment.
 import { onChainSeasonConfigs } from '../constants/contract.js';
 import { createClient, Errors } from '@farcaster/quick-auth';
@@ -120,17 +120,17 @@ export async function GET(request: Request) {
     console.log('[onchain-leaderboard] Public VIEM client created.');
     console.log('[onchain-leaderboard] Attempting to read contract...');
 
-    // FIX: Use `getContract` to create a typed contract instance. This avoids a potential
-    // type inference issue with `client.readContract` that was causing a build error.
-    const leaderboardContract = getContract({
-      address: seasonConfig.address,
-      abi: seasonConfig.abi,
-      // FIX: The client created with `createPublicClient` should be passed as `publicClient`.
-      // Using `client` shorthand was causing viem's type inference to fail.
-      publicClient: client,
+    // FIX: Replaced the `getContract` helper with a more direct and robust `client.readContract` call.
+    // This avoids potential issues with contract instance creation in the serverless environment.
+    const leaderboardData = await client.readContract({
+        address: seasonConfig.address,
+        abi: seasonConfig.abi,
+        functionName: 'getLeaderboard',
+        // FIX: Explicitly providing an empty `args` array for functions with no arguments
+        // helps TypeScript resolve the correct overload for `readContract` and avoids
+        // a type inference issue present in some versions of viem.
+        args: [],
     });
-
-    const leaderboardData = await leaderboardContract.read.getLeaderboard();
 
     console.log(`[onchain-leaderboard] Successfully read from contract. Raw data length: ${leaderboardData.length}`);
     console.log('[onchain-leaderboard] Enriching leaderboard data with Farcaster profiles via Neynar API...');
