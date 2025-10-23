@@ -54,6 +54,8 @@ export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const season = searchParams.get('season') as keyof typeof onChainSeasonConfigs | null;
 
+  console.log(`[onchain-leaderboard] Received request for season: ${season}`);
+
   if (!season || !onChainSeasonConfigs[season]) {
     return new Response(JSON.stringify({ message: 'Invalid or missing season parameter' }), {
       status: 400,
@@ -62,6 +64,8 @@ export async function GET(request: Request) {
   }
 
   const seasonConfig = onChainSeasonConfigs[season];
+  console.log('[onchain-leaderboard] Found season config:', { address: seasonConfig.address, chainId: seasonConfig.chainId });
+
 
   // --- Handle Authentication to identify current user ---
   const quickAuthClient = createClient();
@@ -101,6 +105,7 @@ export async function GET(request: Request) {
           }
         }
       }
+      console.log(`[onchain-leaderboard] Authenticated user address: ${currentUserAddress}`);
     } catch (e) {
       if (e instanceof Errors.InvalidTokenError) {
         console.warn(`[onchain-leaderboard] Invalid token for domain "${domain}".`);
@@ -115,37 +120,54 @@ export async function GET(request: Request) {
     if (!chain) {
       throw new Error(`Chain configuration not found for chainId: ${seasonConfig.chainId}`);
     }
+    console.log(`[onchain-leaderboard] Mapped to chain: ${chain.name}`);
 
     const client = createPublicClient({
       chain: chain,
       transport: http(),
     });
+    console.log('[onchain-leaderboard] Public VIEM client created.');
+    console.log('[onchain-leaderboard] Attempting to read contract...');
 
-    // FIX: The previous fix of adding `args: []` seems to cause a type error.
-    // Omitting `args` for contract functions that take no arguments is the standard approach.
+    // FIX: Explicitly provide an empty args array for functions with no arguments.
+    // This helps TypeScript select the correct overload for readContract and avoids type errors.
     const leaderboardData = await client.readContract({
       address: seasonConfig.address,
       abi: seasonConfig.abi,
       functionName: 'getLeaderboard',
+      args: [],
     });
+    console.log(`[onchain-leaderboard] Successfully read from contract. Raw data length: ${leaderboardData.length}`);
+    console.log('[onchain-leaderboard] Enriching leaderboard data with Farcaster profiles...');
 
     const enrichedLeaderboard = await Promise.all(
       leaderboardData.map(async (entry, index) => {
-        let displayName = formatAddress(entry.player);
+        const address = entry.player;
+        let displayName = formatAddress(address);
         let fid: number | null = null;
+        
+        console.log(`[Enrichment] Processing address: ${address}`);
 
         try {
           // Use Warpcast's reliable API to find user by any verified address
-          const userResponse = await fetch(`https://api.warpcast.com/v2/user-by-verified-address?address=${entry.player}`);
+          const userResponse = await fetch(`https://api.warpcast.com/v2/user-by-verified-address?address=${address}`);
+          console.log(`[Enrichment] API response status for ${address}: ${userResponse.status}`);
+
           if (userResponse.ok) {
             const userData = await userResponse.json();
             if (userData.result && userData.result.user) {
               displayName = userData.result.user.displayName;
               fid = userData.result.user.fid;
+              console.log(`[Enrichment] Found user for ${address}: ${displayName} (FID: ${fid})`);
+            } else {
+              console.log(`[Enrichment] User not found in API response for ${address}.`);
             }
+          } else {
+             const errorBody = await userResponse.text();
+             console.warn(`[Enrichment] API call failed for ${address}. Status: ${userResponse.status}, Body: ${errorBody}`);
           }
         } catch (fetchError) {
-          console.warn(`[onchain-leaderboard] Could not fetch Farcaster profile for address ${entry.player}:`, fetchError);
+          console.error(`[Enrichment] Fetch error for address ${address}:`, fetchError);
         }
 
         return {
@@ -153,16 +175,18 @@ export async function GET(request: Request) {
           displayName,
           fid,
           score: Number(entry.score),
-          isCurrentUser: !!currentUserAddress && entry.player.toLowerCase() === currentUserAddress,
+          isCurrentUser: !!currentUserAddress && address.toLowerCase() === currentUserAddress,
         };
       })
     );
+    console.log('[onchain-leaderboard] Data enrichment complete.');
     
     // Sort the final result to ensure the current user (if not in top results) is placed correctly.
     enrichedLeaderboard.sort((a, b) => b.score - a.score);
     // Re-assign ranks after sorting
     const finalLeaderboard = enrichedLeaderboard.map((entry, index) => ({ ...entry, rank: index + 1 }));
 
+    console.log('[onchain-leaderboard] Leaderboard sorted. Sending response.');
     return new Response(JSON.stringify(finalLeaderboard), {
       status: 200,
       headers: { 'Content-Type': 'application/json' },
