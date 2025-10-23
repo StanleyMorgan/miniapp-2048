@@ -5,7 +5,7 @@ export const revalidate = 60; // Cache for 60 seconds
 
 import { createPublicClient, http, defineChain } from 'viem';
 import { base, celo } from 'viem/chains';
-import { onChainSeasonConfigs, OnChainSeasonConfig } from '../constants/contract';
+import { onChainSeasonConfigs, OnChainSeasonConfig } from '../constants/contract.js';
 // FIX: Import JWTPayload to extend it for custom claims.
 import { createClient, Errors, type JWTPayload } from '@farcaster/quick-auth';
 import type { Season } from '../components/SeasonSelector';
@@ -146,14 +146,15 @@ export async function GET(request: Request) {
     console.log('[onchain-leaderboard] Public VIEM client created.');
 
     console.log('[onchain-leaderboard] Attempting to read contract and get current user...');
-    // FIX: Removed the `args: []` property from the `readContract` call. For contract functions that take no arguments,
-    // recent versions of viem expect the `args` property to be omitted entirely. Including it
-    // can cause type inference issues, leading to the "authorizationList is missing" error.
+    // FIX: Explicitly passing `args: []` for contract functions that take no arguments.
+    // Some versions of viem have type inference issues when `args` is omitted,
+    // leading to it expecting transaction-related properties like `authorizationList`.
     const [rawLeaderboard, currentUserAddress] = await Promise.all([
         publicClient.readContract({
             address: seasonConfig.address,
             abi: seasonConfig.abi,
             functionName: 'getLeaderboard',
+            args: [],
         }) as Promise<RawLeaderboardEntry[]>,
         getCurrentUserPrimaryAddress(request)
     ]);
