@@ -56,29 +56,33 @@ async function getFarcasterUser(address: string): Promise<{ displayName: string;
   }
 
   try {
-    // This public API can find a user by their connected address.
-    const response = await fetch(`https://api.warpcast.com/v2/user-by-custody-address?custody_address=${address}`);
+    // Using the fnames API which is better at resolving any verified address to a username.
+    const response = await fetch(`https://fnames.farcaster.xyz/transfers/current?address=${address}`);
     if (response.ok) {
       const data = await response.json();
-      if (data.result && data.result.user) {
-        const user = data.result.user;
+      // The API returns an array of transfers, we want the most recent one's username.
+      if (data.transfers && data.transfers.length > 0) {
+        const username = data.transfers[0].username;
+        const fid = data.transfers[0].to; // The 'to' field is the FID
         const result = {
-          displayName: user.displayName,
-          fid: user.fid,
+          displayName: username, // Use the fname as the display name
+          fid: fid ? Number(fid) : null,
         };
         userCache.set(address.toLowerCase(), { data: result, timestamp: Date.now() });
         return result;
       }
     }
   } catch (error) {
-    console.warn(`[onchain-leaderboard] Failed to fetch Farcaster user for address ${address}:`, error);
+    console.warn(`[onchain-leaderboard] Failed to fetch Farcaster fname for address ${address}:`, error);
   }
+
   // Fallback for addresses not on Farcaster or if API fails
   return {
     displayName: `${address.slice(0, 6)}...${address.slice(-4)}`,
     fid: null
   };
 }
+
 
 async function getCurrentUserPrimaryAddress(request: Request): Promise<string | null> {
     const quickAuthClient = createClient();
@@ -146,15 +150,14 @@ export async function GET(request: Request) {
     console.log('[onchain-leaderboard] Public VIEM client created.');
 
     console.log('[onchain-leaderboard] Attempting to read contract and get current user...');
-    // FIX: Explicitly passing `args: []` for contract functions that take no arguments.
-    // Some versions of viem have type inference issues when `args` is omitted,
+    // FIX: The `args` property must be omitted for contract functions that take no arguments.
+    // Some versions of viem have type inference issues when `args` is passed (even as an empty array),
     // leading to it expecting transaction-related properties like `authorizationList`.
     const [rawLeaderboard, currentUserAddress] = await Promise.all([
         publicClient.readContract({
             address: seasonConfig.address,
             abi: seasonConfig.abi,
             functionName: 'getLeaderboard',
-            args: [],
         }) as Promise<RawLeaderboardEntry[]>,
         getCurrentUserPrimaryAddress(request)
     ]);
