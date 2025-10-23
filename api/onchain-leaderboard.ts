@@ -125,7 +125,9 @@ export async function GET(request: Request) {
     const leaderboardContract = getContract({
       address: seasonConfig.address,
       abi: seasonConfig.abi,
-      client,
+      // FIX: The client created with `createPublicClient` should be passed as `publicClient`.
+      // Using `client` shorthand was causing viem's type inference to fail.
+      publicClient: client,
     });
 
     const leaderboardData = await leaderboardContract.read.getLeaderboard();
@@ -168,10 +170,10 @@ export async function GET(request: Request) {
             if (userArray && userArray.length > 0) {
               const user = userArray[0];
               userProfileMap.set(address.toLowerCase(), {
-                displayName: user.display_name, // Correct property is display_name
+                displayName: user.username, // Use username for consistency with the Farcaster leaderboard
                 fid: user.fid,
               });
-              console.log(`[Enrichment] Found profile for ${address}: ${user.display_name}`);
+              console.log(`[Enrichment] Found profile for ${address}: ${user.username}`);
             }
           }
         } else {
