@@ -1,13 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { sdk } from '@farcaster/miniapp-sdk';
-import { useReadContract, useAccount } from 'wagmi';
+import { useAccount } from 'wagmi'; // Keep for network checks
 import { onChainSeasonConfigs } from '../constants/contract';
 import { Season } from './SeasonSelector';
 
 interface LeaderboardEntry {
   rank: number;
   displayName: string;
-  fid: number;
+  fid: number | null; // FID can be null for on-chain addresses without Farcaster accounts
   score: number;
   isCurrentUser?: boolean;
 }
@@ -64,117 +64,82 @@ const SkeletonLoader: React.FC = () => (
 
 
 const Leaderboard: React.FC<LeaderboardProps> = ({ isReady, activeSeason }) => {
-  // --- State for Farcaster (off-chain) Leaderboard ---
-  const [farcasterData, setFarcasterData] = useState<LeaderboardEntry[]>([]);
-  const [isFarcasterLoading, setIsFarcasterLoading] = useState(true);
-  const [farcasterError, setFarcasterError] = useState<string | null>(null);
+  // --- State for both Leaderboard types ---
+  const [data, setData] = useState<LeaderboardEntry[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-  // --- WAGMI Hooks for On-Chain Leaderboard ---
-  const { address: userAddress, chainId, isConnected } = useAccount();
+  // --- WAGMI Hooks for On-Chain UX (network checks) ---
+  const { isConnected, chainId } = useAccount();
   const activeSeasonConfig = isOnChainSeason(activeSeason) ? onChainSeasonConfigs[activeSeason] : null;
 
-  const isQueryEnabled = isReady && !!activeSeasonConfig && isConnected && chainId === activeSeasonConfig.chainId;
-
-  const {
-    data: onChainLeaderboard,
-    error: onChainError,
-    isLoading: isOnChainLoading,
-  } = useReadContract({
-    address: activeSeasonConfig?.address,
-    abi: activeSeasonConfig?.abi,
-    functionName: 'getLeaderboard',
-    query: {
-      enabled: isQueryEnabled,
-    },
-  });
-
-  // --- Effect for fetching Farcaster Leaderboard Data ---
+  // --- Effect for fetching ALL Leaderboard Data ---
   useEffect(() => {
-    if (!isReady || activeSeason !== 'farcaster') {
-      return;
-    }
+    if (!isReady) return;
 
-    const fetchFarcasterLeaderboard = async () => {
-      setIsFarcasterLoading(true);
-      setFarcasterError(null);
-      setFarcasterData([]);
+    const fetchLeaderboard = async () => {
+      setIsLoading(true);
+      setError(null);
+      setData([]);
 
       try {
+        let url: string;
+        if (isOnChainSeason(activeSeason)) {
+          url = `/api/onchain-leaderboard?season=${activeSeason}`;
+        } else {
+          url = '/api/leaderboard';
+        }
+        
         const authResult = await sdk.quickAuth.getToken();
         const headers: HeadersInit = {};
         if ('token' in authResult) {
           headers['Authorization'] = `Bearer ${authResult.token}`;
         }
-        const response = await fetch('/api/leaderboard', { headers });
+        
+        const response = await fetch(url, { headers });
+
         if (!response.ok) {
           throw new Error(`Network response was not ok (${response.status})`);
         }
-        const data: LeaderboardEntry[] = await response.json();
-        setFarcasterData(data);
+        const responseData: LeaderboardEntry[] = await response.json();
+        setData(responseData);
       } catch (err: any) {
-        console.error('Failed to fetch Farcaster leaderboard:', err);
-        setFarcasterError('Could not load leaderboard. Please try again later.');
+        console.error(`Failed to fetch leaderboard for season '${activeSeason}':`, err);
+        setError('Could not load leaderboard. Please try again later.');
       } finally {
-        setIsFarcasterLoading(false);
+        setIsLoading(false);
       }
     };
 
-    fetchFarcasterLeaderboard();
+    fetchLeaderboard();
   }, [isReady, activeSeason]);
 
-
   const renderContent = () => {
-    // --- On-Chain Season Logic ---
+    // --- UX for On-Chain Seasons ---
     if (activeSeasonConfig) {
       if (!isConnected) {
-        return <div className="text-center text-slate-400 p-8">Waiting for wallet connection...</div>;
+        return <div className="text-center text-slate-400 p-8">Connect your wallet to see your rank.</div>;
       }
       if (chainId !== activeSeasonConfig.chainId) {
         return (
           <div className="text-center text-yellow-300 p-8" role="alert">
-            Please switch to the {activeSeasonConfig.chainName} network to view the leaderboard.
+            Please switch to the {activeSeasonConfig.chainName} network.
           </div>
         );
       }
-      if (isOnChainLoading) {
-        return <SkeletonLoader />;
-      }
-      if (onChainError) {
-        return <div className="text-center text-red-400 p-8" role="alert">Could not load on-chain leaderboard.</div>;
-      }
-      if (!onChainLeaderboard || !Array.isArray(onChainLeaderboard) || onChainLeaderboard.length === 0) {
-        return <div className="text-center text-slate-400 p-8">No scores yet. Be the first!</div>;
-      }
-      
-      const formattedData = (onChainLeaderboard as { player: string; score: bigint }[])
-        .map((entry, index) => ({
-          rank: index + 1,
-          displayName: `${entry.player.slice(0, 6)}...${entry.player.slice(-4)}`,
-          fid: index, // Not a real FID, just a unique key
-          score: Number(entry.score),
-          isCurrentUser: !!userAddress && userAddress.toLowerCase() === entry.player.toLowerCase(),
-        }))
-        .sort((a, b) => b.score - a.score)
-        .map((entry, index) => ({ ...entry, rank: index + 1 }));
-
-      return <LeaderboardList data={formattedData} />;
     }
-
-    // --- Farcaster Season Logic ---
-    if (activeSeason === 'farcaster') {
-      if (isFarcasterLoading) {
-        return <SkeletonLoader />;
-      }
-      if (farcasterError) {
-        return <div className="text-center text-red-400 p-8" role="alert">{farcasterError}</div>;
-      }
-      if (farcasterData.length === 0) {
-        return <div className="text-center text-slate-400 p-8">No scores yet. Be the first!</div>;
-      }
-      return <LeaderboardList data={farcasterData} />;
+    
+    // --- General Data Display Logic ---
+    if (isLoading) {
+      return <SkeletonLoader />;
     }
-
-    return null; // Should not be reached
+    if (error) {
+      return <div className="text-center text-red-400 p-8" role="alert">{error}</div>;
+    }
+    if (data.length === 0) {
+      return <div className="text-center text-slate-400 p-8">No scores yet. Be the first!</div>;
+    }
+    return <LeaderboardList data={data} />;
   };
 
   return (

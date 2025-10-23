@@ -1,5 +1,6 @@
 
 
+
 // --- MONAD S0 CONTRACT DETAILS ---
 // The contract address is now loaded from a Vite environment variable.
 // Create a .env.local file in your project root and add:
@@ -16,18 +17,20 @@ export const CELO_LEADERBOARD_ADDRESS = (import.meta as any).env.VITE_CELO_CONTR
 
 // --- SHARED LEADERBOARD ABI ---
 // This ABI is assumed to be the same for Monad, Base, and Celo leaderboards.
+// FIX: Add `as const` to strongly type the ABI for better type inference with viem/wagmi.
 export const LEADERBOARD_ABI = [
   {"anonymous":false,"inputs":[{"indexed":true,"internalType":"address","name":"player","type":"address"},{"indexed":false,"internalType":"uint64","name":"score","type":"uint64"}],"name":"GameSubmitted","type":"event"},
   {"inputs":[],"name":"getLeaderboard","outputs":[{"components":[{"internalType":"address","name":"player","type":"address"},{"internalType":"uint64","name":"score","type":"uint64"}],"internalType":"struct GameLeaderboard.Leader[]","name":"","type":"tuple[]"}],"stateMutability":"view","type":"function"},
   {"inputs":[{"internalType":"uint256","name":"","type":"uint256"}],"name":"leaderboard","outputs":[{"internalType":"address","name":"player","type":"address"},{"internalType":"uint64","name":"score","type":"uint64"}],"stateMutability":"view","type":"function"},
   {"inputs":[{"internalType":"address","name":"","type":"address"}],"name":"results","outputs":[{"internalType":"uint128","name":"packedBoard","type":"uint128"},{"internalType":"uint64","name":"score","type":"uint64"},{"internalType":"uint64","name":"startTime","type":"uint64"},{"internalType":"uint64","name":"endTime","type":"uint64"},{"internalType":"bytes32","name":"seed","type":"bytes32"},{"internalType":"bytes32","name":"randomness","type":"bytes32"},{"internalType":"bytes32","name":"movesHash","type":"bytes32"}],"stateMutability":"view","type":"function"},
   {"inputs":[{"internalType":"uint128","name":"packedBoard","type":"uint128"},{"internalType":"uint64","name":"score","type":"uint64"},{"internalType":"uint64","name":"startTime","type":"uint64"},{"internalType":"uint64","name":"endTime","type":"uint64"},{"internalType":"bytes32","name":"seed","type":"bytes32"},{"internalType":"bytes32","name":"randomness","type":"bytes32"},{"internalType":"bytes32","name":"movesHash","type":"bytes32"}],"name":"submitGame","outputs":[],"stateMutability":"nonpayable","type":"function"}
-];
+] as const;
 
 // Helper type for on-chain season configuration
+// FIX: Use the strongly-typed ABI to fix type errors in contract calls.
 export type OnChainSeasonConfig = {
   address: `0x${string}`;
-  abi: any;
+  abi: typeof LEADERBOARD_ABI;
   chainId: number;
   chainName: string;
 };
