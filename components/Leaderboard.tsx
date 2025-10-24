@@ -147,8 +147,10 @@ const Leaderboard: React.FC<LeaderboardProps> = ({ isReady, activeSeason, prize,
   return (
     <div className="bg-slate-600 p-4 rounded-lg w-full animate-fade-in">
       {prize && prizeUnit && (
-        <div className="text-center text-orange-400 font-semibold mb-4 text-lg">
-          Season Prize Pool: {prize} {prizeUnit}
+        <div className="text-center text-white font-semibold mb-4 text-lg">
+          <span>Season Prize Pool: </span>
+          <span className="text-orange-400">{prize}</span>
+          <span> {prizeUnit}</span>
         </div>
       )}
       <div className="flex items-center gap-2 px-3 text-sm text-slate-400 font-bold mb-2">
