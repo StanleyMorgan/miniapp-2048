@@ -77,11 +77,6 @@ const SeasonSelector: React.FC<SeasonSelectorProps> = ({ activeSeason, onSeasonC
               aria-selected={activeSeason === season.id}
             >
               <span>{season.name}</span>
-               {season.prize && season.prizeUnit && (
-                <span className="text-xs bg-orange-500/50 text-orange-300 font-semibold px-2 py-1 rounded-full">
-                  🏆 {season.prize} {season.prizeUnit}
-                </span>
-              )}
             </button>
           ))}
         </div>

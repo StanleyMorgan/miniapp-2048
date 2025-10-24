@@ -146,7 +146,6 @@ const Leaderboard: React.FC<LeaderboardProps> = ({ isReady, activeSeason, prize,
 
   return (
     <div className="bg-slate-600 p-4 rounded-lg w-full animate-fade-in">
-      <h2 className="text-2xl font-bold text-center mb-1">Leaderboard</h2>
       {prize && prizeUnit && (
         <div className="text-center text-orange-400 font-semibold mb-4 text-lg">
           🏆 Season Prize Pool: {prize} {prizeUnit} 🏆
