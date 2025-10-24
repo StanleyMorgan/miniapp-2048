@@ -7,15 +7,15 @@ interface RewardsDisplayProps {
 
 const RewardsDisplay: React.FC<RewardsDisplayProps> = ({ prize, unit }) => {
   return (
-    <div className="bg-slate-700 p-3 rounded-lg text-center w-full h-full flex flex-col justify-center border-2 border-slate-600">
-      <div className="text-xs text-slate-400 uppercase tracking-wider">Rewards</div>
+    <div className="bg-slate-700 p-3 rounded-lg text-center w-full h-full flex items-center justify-center">
       {prize && unit ? (
-        <div className="text-2xl font-bold">
+        <div className="text-xl font-bold">
+            <span className="text-slate-400 uppercase tracking-wider">Total: </span>
             <span className="text-orange-400">{prize}</span>
             <span className="text-white ml-1">{unit}</span>
         </div>
       ) : (
-        <div className="text-2xl font-bold text-slate-500">-</div>
+        <div className="text-xl font-bold text-slate-500">-</div>
       )}
     </div>
   );
