@@ -6,7 +6,8 @@ import GameControls from './components/GameControls';
 import GameOver from './components/GameOver';
 import Tabs from './components/Tabs';
 import Leaderboard from './components/Leaderboard';
-import SeasonSelector, { Season } from './components/SeasonSelector';
+import SeasonSelector, { Season, seasons } from './components/SeasonSelector';
+import RewardsDisplay from './components/RewardsDisplay';
 import { useAccount, useSwitchChain } from 'wagmi';
 import { onChainSeasonConfigs } from './constants/contract';
 
@@ -216,14 +217,31 @@ const App: React.FC = () => {
     );
   }
 
+  const activeSeasonData = seasons.find(s => s.id === activeSeason);
+
   return (
     <div className="min-h-screen w-screen text-white flex flex-col items-center p-4 font-sans">
       <div className="w-full sm:max-w-md mx-auto flex flex-col flex-grow">
         <Tabs activeTab={activeTab} onTabChange={setActiveTab} />
-        <SeasonSelector activeSeason={activeSeason} onSeasonChange={setActiveSeason} />
+        
+        <div className="flex w-full gap-2 mb-4 items-stretch">
+          <div className="flex-1">
+            <SeasonSelector activeSeason={activeSeason} onSeasonChange={setActiveSeason} />
+          </div>
+          <div className="flex-1">
+            <RewardsDisplay prize={activeSeasonData?.prize} unit={activeSeasonData?.prizeUnit} />
+          </div>
+        </div>
         
         <main className="flex-grow flex flex-col w-full items-center justify-center">
-          {activeTab === 'game' ? renderGameContent() : <Leaderboard isReady={isAppReady} activeSeason={activeSeason} />}
+          {activeTab === 'game' 
+            ? renderGameContent() 
+            : <Leaderboard 
+                isReady={isAppReady} 
+                activeSeason={activeSeason} 
+                prize={activeSeasonData?.prize}
+                prizeUnit={activeSeasonData?.prizeUnit}
+              />}
         </main>
       </div>
     </div>

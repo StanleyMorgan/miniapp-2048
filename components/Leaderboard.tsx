@@ -15,6 +15,8 @@ interface LeaderboardEntry {
 interface LeaderboardProps {
   isReady: boolean;
   activeSeason: Season;
+  prize?: number;
+  prizeUnit?: string;
 }
 
 // Type guard to check if a season is an on-chain season
@@ -63,7 +65,7 @@ const SkeletonLoader: React.FC = () => (
 );
 
 
-const Leaderboard: React.FC<LeaderboardProps> = ({ isReady, activeSeason }) => {
+const Leaderboard: React.FC<LeaderboardProps> = ({ isReady, activeSeason, prize, prizeUnit }) => {
   // --- State for both Leaderboard types ---
   const [data, setData] = useState<LeaderboardEntry[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -144,7 +146,12 @@ const Leaderboard: React.FC<LeaderboardProps> = ({ isReady, activeSeason }) => {
 
   return (
     <div className="bg-slate-600 p-4 rounded-lg w-full animate-fade-in">
-      <h2 className="text-2xl font-bold text-center mb-4">Leaderboard</h2>
+      <h2 className="text-2xl font-bold text-center mb-1">Leaderboard</h2>
+      {prize && prizeUnit && (
+        <div className="text-center text-orange-400 font-semibold mb-4 text-lg">
+          🏆 Season Prize Pool: {prize} {prizeUnit} 🏆
+        </div>
+      )}
       <div className="flex items-center gap-2 px-3 text-sm text-slate-400 font-bold mb-2">
         <span className="w-16 text-left">Rank</span>
         <span className="flex-1 text-center">Player</span>

@@ -123,10 +123,12 @@ export async function GET(request: Request) {
 
     // FIX: Replaced the `getContract` helper with a more direct and robust `client.readContract` call.
     // This avoids potential issues with contract instance creation in the serverless environment.
+    // FIX: Explicitly providing an empty `args` array to resolve a TypeScript type inference issue with viem.
     const leaderboardData = await client.readContract({
         address: seasonConfig.address,
         abi: seasonConfig.abi,
         functionName: 'getLeaderboard',
+        args: [],
     });
 
     console.log(`[onchain-leaderboard] Successfully read from contract. Raw data length: ${leaderboardData.length}`);
