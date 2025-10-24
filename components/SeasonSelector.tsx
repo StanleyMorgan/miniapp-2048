@@ -50,7 +50,7 @@ const SeasonSelector: React.FC<SeasonSelectorProps> = ({ activeSeason, onSeasonC
       <button
         type="button"
         onClick={() => setIsOpen(!isOpen)}
-        className="w-full h-full bg-slate-700 text-slate-300 p-3 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 transition-colors uppercase font-bold focus:text-white flex justify-between items-center"
+        className="w-full h-full bg-slate-700 text-slate-300 py-2 px-3 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 transition-colors uppercase font-bold focus:text-white flex justify-between items-center"
         aria-haspopup="listbox"
         aria-expanded={isOpen}
       >
