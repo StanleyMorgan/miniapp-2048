@@ -8,8 +8,6 @@ import { useLeaderboard, isOnChainSeason } from '../hooks/useLeaderboard';
 interface LeaderboardProps {
   isReady: boolean;
   activeSeason: Season;
-  prize?: number;
-  prizeUnit?: string;
 }
 
 // A reusable component to render the list of players
@@ -53,7 +51,7 @@ const SkeletonLoader: React.FC = () => (
 );
 
 
-const Leaderboard: React.FC<LeaderboardProps> = ({ isReady, activeSeason, prize, prizeUnit }) => {
+const Leaderboard: React.FC<LeaderboardProps> = ({ isReady, activeSeason }) => {
   const { data, isLoading, error } = useLeaderboard(isReady, activeSeason);
 
   // --- WAGMI Hooks for On-Chain UX (network checks) ---
@@ -90,13 +88,9 @@ const Leaderboard: React.FC<LeaderboardProps> = ({ isReady, activeSeason, prize,
 
   return (
     <div className="bg-slate-600 p-4 rounded-lg w-full animate-fade-in">
-      {prize && prizeUnit && (
-        <div className="text-center text-white font-semibold mb-4 text-lg">
-          <span>Season Prize Pool: </span>
-          <span className="text-orange-400">{prize}</span>
-          <span> {prizeUnit}</span>
-        </div>
-      )}
+      <div className="text-center text-white font-semibold mb-4 text-lg">
+        Leaderboard
+      </div>
       <div className="flex items-center gap-2 px-3 text-sm text-slate-400 font-bold mb-2">
         <span className="w-16 text-left">Rank</span>
         <span className="flex-1 text-center">Player</span>

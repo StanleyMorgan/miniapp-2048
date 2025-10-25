@@ -293,8 +293,6 @@ const App: React.FC = () => {
             : <Leaderboard 
                 isReady={isAppReady} 
                 activeSeason={activeSeason} 
-                prize={activeSeasonData?.prize}
-                prizeUnit={activeSeasonData?.prizeUnit}
               />}
         </main>
       </div>
