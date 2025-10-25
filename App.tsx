@@ -10,12 +10,16 @@ import SeasonSelector, { Season, seasons } from './components/SeasonSelector';
 import RewardsDisplay from './components/RewardsDisplay';
 import { useAccount, useSwitchChain } from 'wagmi';
 import { onChainSeasonConfigs } from './constants/contract';
+import { useLeaderboard } from './hooks/useLeaderboard';
+import { celoS0RewardShares } from './constants/rewards';
+import InfoDisplay from './components/InfoDisplay';
+import CountdownTimer from './components/CountdownTimer';
 
 const App: React.FC = () => {
   // --- Hooks must be at the top level ---
   const [touchStart, setTouchStart] = useState<{x: number, y: number} | null>(null);
   const [activeTab, setActiveTab] = useState<'game' | 'top'>('game');
-  const [activeSeason, setActiveSeason] = useState<Season>('base-s0');
+  const [activeSeason, setActiveSeason] = useState<Season>('celo-s0');
   
   // --- New Robust Initialization State Management ---
   const [isSdkReady, setIsSdkReady] = useState(false);
@@ -44,6 +48,8 @@ const App: React.FC = () => {
     userAddress,
     submissionStatus
   } = useGameLogic(isAppReady, activeSeason);
+  
+  const { data: leaderboardData, isLoading: isLeaderboardLoading } = useLeaderboard(isAppReady, activeSeason);
 
   // --- Effects for Initialization and Event Handling ---
 
@@ -218,18 +224,57 @@ const App: React.FC = () => {
   }
 
   const activeSeasonData = seasons.find(s => s.id === activeSeason);
+  const celoEndDate = '2025-12-01T00:00:00Z';
+
+  const calculateYourRewards = () => {
+    if (isLeaderboardLoading || !leaderboardData || activeSeason !== 'celo-s0' || !activeSeasonData?.prize) {
+        return <span className="text-slate-500">-</span>;
+    }
+
+    const currentUserEntry = leaderboardData.find(entry => entry.isCurrentUser);
+    if (!currentUserEntry || !currentUserEntry.rank) {
+        return <span className="text-slate-500">-</span>;
+    }
+
+    const rank = currentUserEntry.rank;
+    if (rank > 0 && rank <= celoS0RewardShares.length) {
+        const share = celoS0RewardShares[rank - 1];
+        const reward = activeSeasonData.prize * share;
+        // Format to 4 decimal places if it's not an integer
+        const formattedReward = reward.toFixed(reward % 1 === 0 ? 0 : 4);
+        return <><span className="text-orange-400">{formattedReward}</span><span className="text-white ml-1">{activeSeasonData.prizeUnit}</span></>;
+    }
+
+    return <span className="text-slate-500">-</span>;
+  };
 
   return (
     <div className="min-h-screen w-screen text-white flex flex-col items-center p-4 font-sans">
       <div className="w-full sm:max-w-md mx-auto flex flex-col flex-grow">
         <Tabs activeTab={activeTab} onTabChange={setActiveTab} />
         
-        <div className="flex w-full gap-2 mb-4 items-stretch">
-          <div className="flex-1">
-            <SeasonSelector activeSeason={activeSeason} onSeasonChange={setActiveSeason} />
+        <div className="flex flex-col w-full gap-2 mb-4">
+          <div className="flex w-full gap-2 items-stretch">
+            <div className="flex-1">
+              <SeasonSelector activeSeason={activeSeason} onSeasonChange={setActiveSeason} />
+            </div>
+            <div className="flex-1">
+              <RewardsDisplay prize={activeSeasonData?.prize} unit={activeSeasonData?.prizeUnit} />
+            </div>
           </div>
-          <div className="flex-1">
-            <RewardsDisplay prize={activeSeasonData?.prize} unit={activeSeasonData?.prizeUnit} />
+          <div className="flex w-full gap-2 items-stretch">
+              <div className="flex-1">
+                  <InfoDisplay 
+                      title="Round Ends" 
+                      value={activeSeason === 'celo-s0' ? <CountdownTimer targetDate={celoEndDate} /> : <span className="text-slate-500">-</span>} 
+                  />
+              </div>
+              <div className="flex-1">
+                  <InfoDisplay 
+                      title="Your Rewards" 
+                      value={calculateYourRewards()} 
+                  />
+              </div>
           </div>
         </div>
         

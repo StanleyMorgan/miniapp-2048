@@ -1,16 +1,9 @@
-import React, { useState, useEffect } from 'react';
-import { sdk } from '@farcaster/miniapp-sdk';
-import { useAccount } from 'wagmi'; // Keep for network checks
+import React from 'react';
+import { useAccount } from 'wagmi';
 import { onChainSeasonConfigs } from '../constants/contract';
 import { Season } from './SeasonSelector';
-
-interface LeaderboardEntry {
-  rank: number;
-  displayName: string;
-  fid: number | null; // FID can be null for on-chain addresses without Farcaster accounts
-  score: number;
-  isCurrentUser?: boolean;
-}
+import type { LeaderboardEntry } from '../types';
+import { useLeaderboard, isOnChainSeason } from '../hooks/useLeaderboard';
 
 interface LeaderboardProps {
   isReady: boolean;
@@ -18,11 +11,6 @@ interface LeaderboardProps {
   prize?: number;
   prizeUnit?: string;
 }
-
-// Type guard to check if a season is an on-chain season
-const isOnChainSeason = (season: Season): season is keyof typeof onChainSeasonConfigs => {
-  return onChainSeasonConfigs.hasOwnProperty(season);
-};
 
 // A reusable component to render the list of players
 const LeaderboardList: React.FC<{ data: LeaderboardEntry[] }> = ({ data }) => {
@@ -66,55 +54,11 @@ const SkeletonLoader: React.FC = () => (
 
 
 const Leaderboard: React.FC<LeaderboardProps> = ({ isReady, activeSeason, prize, prizeUnit }) => {
-  // --- State for both Leaderboard types ---
-  const [data, setData] = useState<LeaderboardEntry[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const { data, isLoading, error } = useLeaderboard(isReady, activeSeason);
 
   // --- WAGMI Hooks for On-Chain UX (network checks) ---
   const { isConnected, chainId } = useAccount();
   const activeSeasonConfig = isOnChainSeason(activeSeason) ? onChainSeasonConfigs[activeSeason] : null;
-
-  // --- Effect for fetching ALL Leaderboard Data ---
-  useEffect(() => {
-    if (!isReady) return;
-
-    const fetchLeaderboard = async () => {
-      setIsLoading(true);
-      setError(null);
-      setData([]);
-
-      try {
-        let url: string;
-        if (isOnChainSeason(activeSeason)) {
-          url = `/api/onchain-leaderboard?season=${activeSeason}`;
-        } else {
-          url = '/api/leaderboard';
-        }
-        
-        const authResult = await sdk.quickAuth.getToken();
-        const headers: HeadersInit = {};
-        if ('token' in authResult) {
-          headers['Authorization'] = `Bearer ${authResult.token}`;
-        }
-        
-        const response = await fetch(url, { headers });
-
-        if (!response.ok) {
-          throw new Error(`Network response was not ok (${response.status})`);
-        }
-        const responseData: LeaderboardEntry[] = await response.json();
-        setData(responseData);
-      } catch (err: any) {
-        console.error(`Failed to fetch leaderboard for season '${activeSeason}':`, err);
-        setError('Could not load leaderboard. Please try again later.');
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
-    fetchLeaderboard();
-  }, [isReady, activeSeason]);
 
   const renderContent = () => {
     // --- UX for On-Chain Seasons ---
