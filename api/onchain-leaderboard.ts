@@ -122,13 +122,11 @@ export async function GET(request: Request) {
     console.log('[onchain-leaderboard] Public VIEM client created.');
     console.log('[onchain-leaderboard] Attempting to read contract...');
 
-    // FIX: For viem `readContract` calls on functions that take no arguments, providing `args: [] as const`
-    // helps TypeScript resolve the correct function overload and avoid type errors.
+    // FIX: For viem `readContract` calls on functions that take no arguments, the `args` property can be omitted.
     const leaderboardData = await client.readContract({
         address: seasonConfig.address,
         abi: seasonConfig.abi,
         functionName: 'getLeaderboard',
-        args: [] as const,
     });
 
     console.log(`[onchain-leaderboard] Successfully read from contract. Raw data length: ${leaderboardData.length}`);
