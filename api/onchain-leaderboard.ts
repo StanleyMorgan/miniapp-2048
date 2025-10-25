@@ -1,5 +1,6 @@
 
 
+
 import { createPublicClient, http, defineChain } from 'viem';
 // FIX: Added .js extension, which is mandatory for module resolution in Vercel's Node.js environment.
 import { onChainSeasonConfigs } from '../constants/contract.js';
@@ -122,8 +123,8 @@ export async function GET(request: Request) {
     console.log('[onchain-leaderboard] Public VIEM client created.');
     console.log('[onchain-leaderboard] Attempting to read contract...');
 
-    // FIX: Explicitly pass an empty array for `args` to resolve a TypeScript type
-    // inference issue with viem's `readContract` for functions with no arguments.
+    // FIX: The `getLeaderboard` function takes no arguments. Providing an empty `args` array
+    // helps TypeScript correctly infer the contract function signature and prevent type errors.
     const leaderboardData = await client.readContract({
         address: seasonConfig.address,
         abi: seasonConfig.abi,

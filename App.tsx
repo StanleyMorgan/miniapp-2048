@@ -237,8 +237,17 @@ const App: React.FC = () => {
     }
 
     const rank = currentUserEntry.rank;
-    if (rank > 0 && rank <= celoS0RewardShares.length) {
-        const share = celoS0RewardShares[rank - 1];
+    const totalPlayers = leaderboardData.length;
+    let effectiveRank = rank;
+
+    // For early players, calculate rewards as if they are the last N players in the top 100.
+    // Example: 3 players (ranks 1, 2, 3) get rewards for ranks 98, 99, 100.
+    if (totalPlayers > 0 && totalPlayers < 100) {
+      effectiveRank = 100 - totalPlayers + rank;
+    }
+
+    if (effectiveRank > 0 && effectiveRank <= celoS0RewardShares.length) {
+        const share = celoS0RewardShares[effectiveRank - 1];
         const reward = activeSeasonData.prize * share;
         // Format to 4 decimal places if it's not an integer
         const formattedReward = reward.toFixed(reward % 1 === 0 ? 0 : 4);
@@ -265,13 +274,13 @@ const App: React.FC = () => {
           <div className="flex w-full gap-2 items-stretch">
               <div className="flex-1">
                   <InfoDisplay 
-                      title="Round Ends" 
+                      title="⏰" 
                       value={activeSeason === 'celo-s0' ? <CountdownTimer targetDate={celoEndDate} /> : <span className="text-slate-500">-</span>} 
                   />
               </div>
               <div className="flex-1">
                   <InfoDisplay 
-                      title="Your Rewards" 
+                      title="🏆" 
                       value={calculateYourRewards()} 
                   />
               </div>
