@@ -7,7 +7,7 @@ interface RewardsDisplayProps {
 
 const RewardsDisplay: React.FC<RewardsDisplayProps> = ({ prize, unit }) => {
   return (
-    <div className="bg-slate-700 py-2 px-3 rounded-lg text-center w-full h-full flex items-center justify-center">
+    <div className="bg-slate-700 py-2 px-3 rounded-lg w-full h-full flex items-center justify-start">
       {prize && unit ? (
         <div className="uppercase font-bold">
             <span className="text-slate-300 uppercase tracking-wider">Total: </span>

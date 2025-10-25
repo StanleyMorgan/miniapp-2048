@@ -19,7 +19,7 @@ const App: React.FC = () => {
   // --- Hooks must be at the top level ---
   const [touchStart, setTouchStart] = useState<{x: number, y: number} | null>(null);
   const [activeTab, setActiveTab] = useState<'game' | 'top'>('game');
-  const [activeSeason, setActiveSeason] = useState<Season>('celo-s0');
+  const [activeSeason, setActiveSeason] = useState<Season>('base-s0');
   
   // --- New Robust Initialization State Management ---
   const [isSdkReady, setIsSdkReady] = useState(false);
