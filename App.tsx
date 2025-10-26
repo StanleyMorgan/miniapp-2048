@@ -211,6 +211,10 @@ const App: React.FC = () => {
   const celoEndDate = '2025-12-01T00:00:00Z';
 
   const calculateYourRewards = () => {
+    if (activeSeason === 'farcaster') {
+      return '****';
+    }
+    
     if (isLeaderboardLoading || !leaderboardData || !['celo-s0', 'monad-s0', 'base-s0'].includes(activeSeason) || !activeSeasonData?.prize) {
         return null;
     }
@@ -242,7 +246,7 @@ const App: React.FC = () => {
   };
 
   const renderTimer = () => {
-    if (activeSeason === 'celo-s0' || activeSeason === 'base-s0') {
+    if (activeSeason === 'farcaster' || activeSeason === 'celo-s0' || activeSeason === 'base-s0') {
       return <CountdownTimer targetDate={celoEndDate} />;
     }
     if (activeSeason === 'monad-s0') {
