@@ -242,7 +242,7 @@ const App: React.FC = () => {
   };
 
   const renderTimer = () => {
-    if (activeSeason === 'celo-s0') {
+    if (activeSeason === 'celo-s0' || activeSeason === 'base-s0') {
       return <CountdownTimer targetDate={celoEndDate} />;
     }
     if (activeSeason === 'monad-s0') {

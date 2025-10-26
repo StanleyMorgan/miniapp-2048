@@ -13,7 +13,7 @@ export interface SeasonInfo {
 export const seasons: SeasonInfo[] = [
   { id: 'farcaster', name: 'FARCASTER' },
   { id: 'monad-s0', name: 'MONAD S0', shareName: 'Monad Season 0', prize: 10, prizeUnit: 'MON' },
-  { id: 'base-s0', name: 'BASE S0', shareName: 'Base Season 0' },
+  { id: 'base-s0', name: 'BASE S0', shareName: 'Base Season 0', prize: 0.01, prizeUnit: 'ETH' },
   { id: 'celo-s0', name: 'CELO S0', shareName: 'Celo Season 0', prize: 100, prizeUnit: 'CELO' },
 ];
 
