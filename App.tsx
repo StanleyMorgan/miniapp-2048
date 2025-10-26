@@ -19,7 +19,7 @@ const App: React.FC = () => {
   // --- Hooks must be at the top level ---
   const [touchStart, setTouchStart] = useState<{x: number, y: number} | null>(null);
   const [activeTab, setActiveTab] = useState<'game' | 'top'>('game');
-  const [activeSeason, setActiveSeason] = useState<Season>('base-s0');
+  const [activeSeason, setActiveSeason] = useState<Season>('farcaster');
   
   // --- New Robust Initialization State Management ---
   const [isSdkReady, setIsSdkReady] = useState(false);
@@ -113,7 +113,7 @@ const App: React.FC = () => {
     // This crucial effect will now only run when the app is fully ready.
     if (!isAppReady) return;
 
-    const seasonConfig = onChainSeasonConfigs[activeSeason];
+    const seasonConfig = onChainSeasonConfigs[activeSeason as keyof typeof onChainSeasonConfigs];
     if (isConnected && seasonConfig && chain?.id !== seasonConfig.chainId && switchChain && !isSwitchingChain) {
       console.log(`[ONCHAIN] Requesting network switch from chain ${chain?.id} to ${seasonConfig.chainId} for season ${activeSeason}`);
       switchChain({ chainId: seasonConfig.chainId });
