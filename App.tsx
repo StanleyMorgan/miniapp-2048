@@ -211,7 +211,7 @@ const App: React.FC = () => {
   const celoEndDate = '2025-12-01T00:00:00Z';
 
   const calculateYourRewards = () => {
-    if (isLeaderboardLoading || !leaderboardData || !['celo-s0', 'monad-s0'].includes(activeSeason) || !activeSeasonData?.prize) {
+    if (isLeaderboardLoading || !leaderboardData || !['celo-s0', 'monad-s0', 'base-s0'].includes(activeSeason) || !activeSeasonData?.prize) {
         return null;
     }
 
