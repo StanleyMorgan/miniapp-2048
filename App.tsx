@@ -256,6 +256,16 @@ const App: React.FC = () => {
     return null;
   };
 
+  const renderTimer = () => {
+    if (activeSeason === 'celo-s0') {
+      return <CountdownTimer targetDate={celoEndDate} />;
+    }
+    if (activeSeason === 'monad-s0') {
+      return <CountdownTimer dailyResetUtc={true} />;
+    }
+    return null;
+  };
+
   return (
     <div className="min-h-screen w-screen text-white flex flex-col items-center p-4 font-sans">
       <div className="w-full sm:max-w-md mx-auto flex flex-col flex-grow">
@@ -274,7 +284,7 @@ const App: React.FC = () => {
               <div className="flex-1">
                   <InfoDisplay 
                       title="⏳" 
-                      value={activeSeason === 'celo-s0' ? <CountdownTimer targetDate={celoEndDate} /> : null} 
+                      value={renderTimer()} 
                   />
               </div>
               <div className="flex-1">
