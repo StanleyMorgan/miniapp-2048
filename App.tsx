@@ -228,12 +228,12 @@ const App: React.FC = () => {
 
   const calculateYourRewards = () => {
     if (isLeaderboardLoading || !leaderboardData || !['celo-s0', 'monad-s0'].includes(activeSeason) || !activeSeasonData?.prize) {
-        return <span className="text-slate-500">-</span>;
+        return null;
     }
 
     const currentUserEntry = leaderboardData.find(entry => entry.isCurrentUser);
     if (!currentUserEntry || !currentUserEntry.rank) {
-        return <span className="text-slate-500">-</span>;
+        return null;
     }
 
     const rank = currentUserEntry.rank;
@@ -254,7 +254,7 @@ const App: React.FC = () => {
         return <><span className="text-orange-400">{formattedReward}</span><span className="text-white ml-1">{activeSeasonData.prizeUnit}</span></>;
     }
 
-    return <span className="text-slate-500">-</span>;
+    return null;
   };
 
   return (
@@ -274,8 +274,8 @@ const App: React.FC = () => {
           <div className="flex w-full gap-2 items-stretch">
               <div className="flex-1">
                   <InfoDisplay 
-                      title="⏰" 
-                      value={activeSeason === 'celo-s0' ? <CountdownTimer targetDate={celoEndDate} /> : <span className="text-slate-500">-</span>} 
+                      title="⏳" 
+                      value={activeSeason === 'celo-s0' ? <CountdownTimer targetDate={celoEndDate} /> : null} 
                   />
               </div>
               <div className="flex-1">
