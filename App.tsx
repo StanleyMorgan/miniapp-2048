@@ -43,6 +43,7 @@ const App: React.FC = () => {
     submitScore,
     isSubmitting,
     hasSubmittedScore,
+    wasNewBestScore,
     userRank,
     isInitializing, // This is for game state, not app init
     userAddress,
@@ -156,22 +157,6 @@ const App: React.FC = () => {
     setTouchStart(null);
   };
   
-  const [shouldShowSaveFlow, setShouldShowSaveFlow] = useState(false);
-
-  const isNewBestScore = serverBestScore !== null
-    ? score > serverBestScore
-    : score > bestScore;
-
-  useEffect(() => {
-    if (isGameOver) {
-      if (isNewBestScore && score > 0) {
-        setShouldShowSaveFlow(true);
-      }
-    } else {
-      setShouldShowSaveFlow(false);
-    }
-  }, [isGameOver, isNewBestScore, score]);
-
   const displayBestScore = serverBestScore !== null ? serverBestScore : bestScore;
 
   // --- Render Logic ---
@@ -211,7 +196,7 @@ const App: React.FC = () => {
               onSubmitScore={submitScore}
               isSubmitting={isSubmitting}
               hasSubmittedScore={hasSubmittedScore}
-              isNewBestScore={shouldShowSaveFlow}
+              isNewBestScore={wasNewBestScore}
               userRank={userRank}
               submissionStatus={submissionStatus}
               activeSeason={activeSeason}

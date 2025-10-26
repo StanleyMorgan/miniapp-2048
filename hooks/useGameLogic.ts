@@ -37,6 +37,7 @@ export const useGameLogic = (isSdkReady: boolean, activeSeason: Season) => {
   const [isMoving, setIsMoving] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [hasSubmittedScore, setHasSubmittedScore] = useState(false);
+  const [wasNewBestScore, setWasNewBestScore] = useState(false);
   const [submissionStatus, setSubmissionStatus] = useState('');
   
   const tileIdCounterRef = useRef(1);
@@ -138,6 +139,17 @@ export const useGameLogic = (isSdkReady: boolean, activeSeason: Season) => {
       setIsSubmitting(false);
     }
   }, [isPending, isConfirming, isConfirmed, writeContractError, txReceiptError, hash]);
+  
+  // When a game ends, check if it was a new best score and latch the state.
+  // This state persists across reloads to ensure the "Share" button is shown correctly.
+  useEffect(() => {
+    if (isGameOver && !wasNewBestScore) {
+      const currentBest = serverBestScore ?? bestScore;
+      if (score > currentBest && score > 0) {
+        setWasNewBestScore(true);
+      }
+    }
+  }, [isGameOver, score, bestScore, serverBestScore, wasNewBestScore]);
 
 
   const newGame = useCallback(async () => {
@@ -151,6 +163,7 @@ export const useGameLogic = (isSdkReady: boolean, activeSeason: Season) => {
     setIsGameOver(false);
     setIsWon(false);
     setHasSubmittedScore(false);
+    setWasNewBestScore(false);
     setIsSubmitting(false);
     setSubmissionStatus('');
     setUserRank(null);
@@ -249,6 +262,8 @@ export const useGameLogic = (isSdkReady: boolean, activeSeason: Season) => {
             setScore(savedState.score);
             setIsGameOver(savedState.isGameOver || false);
             setIsWon(savedState.isWon || false);
+            setHasSubmittedScore(savedState.hasSubmittedScore || false);
+            setWasNewBestScore(savedState.wasNewBestScore || false);
             setSeed(savedState.seed);
             setStartTime(savedState.startTime);
             setMoves(savedState.moves);
@@ -295,10 +310,10 @@ export const useGameLogic = (isSdkReady: boolean, activeSeason: Season) => {
 
     if (shouldSave) {
       const GAME_STATE_KEY = `gameState2048_${activeSeason}`;
-      const gameState = { tiles, score, isGameOver, isWon, seed, startTime, moves, randomness, finalMovesHash };
+      const gameState = { tiles, score, isGameOver, isWon, seed, startTime, moves, randomness, finalMovesHash, hasSubmittedScore, wasNewBestScore };
       localStorage.setItem(GAME_STATE_KEY, JSON.stringify(gameState));
     }
-  }, [tiles, score, isGameOver, isWon, isInitializing, seed, startTime, moves, randomness, finalMovesHash, activeSeason]);
+  }, [tiles, score, isGameOver, isWon, isInitializing, seed, startTime, moves, randomness, finalMovesHash, activeSeason, hasSubmittedScore, wasNewBestScore]);
 
   useEffect(() => {
     if (score > bestScore) {
@@ -482,5 +497,5 @@ export const useGameLogic = (isSdkReady: boolean, activeSeason: Season) => {
     performMove(direction);
   }, [performMove]);
 
-  return { tiles, score, bestScore, serverBestScore, isGameOver, isWon, newGame, handleKeyDown, performMove, submitScore, isSubmitting, hasSubmittedScore, userRank, isInitializing, userAddress, submissionStatus };
+  return { tiles, score, bestScore, serverBestScore, isGameOver, isWon, newGame, handleKeyDown, performMove, submitScore, isSubmitting, hasSubmittedScore, wasNewBestScore, userRank, isInitializing, userAddress, submissionStatus };
 };
