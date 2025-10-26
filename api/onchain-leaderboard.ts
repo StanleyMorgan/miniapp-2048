@@ -1,6 +1,7 @@
 
 
-import { createPublicClient, http, defineChain } from 'viem';
+
+import { createPublicClient, http, defineChain, type Chain } from 'viem';
 // FIX: Added .js extension, which is mandatory for module resolution in Vercel's Node.js environment.
 import { onChainSeasonConfigs } from '../constants/contract.js';
 import { createClient, Errors } from '@farcaster/quick-auth';
@@ -35,7 +36,8 @@ const celo = defineChain({
   },
 });
 
-const chains: { [key: number]: any } = {
+// FIX: Correctly type the chains object to ensure proper type inference by viem's createPublicClient.
+const chains: { [key: number]: Chain } = {
   [monad.id]: monad,
   [base.id]: base,
   [celo.id]: celo,

@@ -233,8 +233,8 @@ const App: React.FC = () => {
     if (effectiveRank > 0 && effectiveRank <= celoS0RewardShares.length) {
         const share = celoS0RewardShares[effectiveRank - 1];
         const reward = activeSeasonData.prize * share;
-        // Format to 4 decimal places if it's not an integer
-        const formattedReward = reward.toFixed(reward % 1 === 0 ? 0 : 4);
+        // Format to 5 decimal places if it's not an integer to show small rewards
+        const formattedReward = reward.toFixed(reward % 1 === 0 ? 0 : 5);
         return <><span className="text-orange-400">{formattedReward}</span><span className="text-white ml-1">{activeSeasonData.prizeUnit}</span></>;
     }
 
