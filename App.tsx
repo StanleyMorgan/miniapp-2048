@@ -207,7 +207,6 @@ const App: React.FC = () => {
           <GameBoard tiles={tiles} />
           {isGameOver && (
             <GameOver 
-              onRestart={newGame} 
               score={score} 
               onSubmitScore={submitScore}
               isSubmitting={isSubmitting}
