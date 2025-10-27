@@ -355,7 +355,7 @@ export const useGameLogic = (isSdkReady: boolean, activeSeason: Season) => {
           switchChain({ chainId: activeSeasonConfig.chainId }, {
             onSuccess: () => {
               console.log('[ONCHAIN] Network switch successful.');
-              setSubmissionStatus(`Network switched. Please "Save Score" again.`);
+              setSubmissionStatus(`Network switched. Please "Confirm Blocks" again.`);
               setIsSubmitting(false);
             },
             onError: (error) => {

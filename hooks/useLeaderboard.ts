@@ -45,7 +45,7 @@ export const useLeaderboard = (isReady: boolean, activeSeason: Season) => {
         setData(responseData);
       } catch (err: any) {
         console.error(`Failed to fetch leaderboard for season '${activeSeason}':`, err);
-        setError('Could not load leaderboard. Please try again later.');
+        setError('Could not load pool statistics. Please try again later.');
       } finally {
         setIsLoading(false);
       }

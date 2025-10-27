@@ -1,4 +1,4 @@
-# React 2048 Game
+# 2048 Mining App
 
 A modern and responsive implementation of the classic 2048 puzzle game.
 

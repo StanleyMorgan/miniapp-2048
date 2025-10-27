@@ -17,7 +17,7 @@ const GameControls: React.FC<GameControlsProps> = ({ score, bestScore, onNewGame
   return (
     <div className="flex justify-end items-center w-full mb-4 px-1 gap-2">
       <ScoreBox title="Score" score={score} />
-      <ScoreBox title="Best" score={bestScore} />
+      <ScoreBox title="Peak Rate" score={bestScore} />
       <button
         onClick={onNewGame}
         className="bg-orange-500 hover:bg-orange-600 text-white font-bold py-2 px-4 rounded-lg transition-colors duration-200 h-12 flex items-center"

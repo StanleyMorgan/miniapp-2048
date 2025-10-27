@@ -9,22 +9,22 @@
   },
   "miniapp": {
     "version": "1",
-    "name": "2048 Mini App",
+    "name": "2048 Mining App",
     "homeUrl": "https://2048-base.vercel.app/",
     "iconUrl": "https://2048-base.vercel.app/logo128.png",
     "splashImageUrl": "https://2048-base.vercel.app/logo128.png",
     "splashBackgroundColor": "#1e293b",
-    "subtitle": "Classic 2048 puzzle on Base.",
-    "description": "A modern and responsive implementation of the classic 2048 puzzle game. Merge tiles to reach the 2048 tile.",
+    "subtitle": "A crypto-themed 2048 puzzle.",
+    "description": "Merge blocks to confirm transactions, increase your hash rate, and compete on the on-chain leaderboards.",
     "screenshotUrls": [
       "https://2048-base.vercel.app/embed.png"
     ],
     "primaryCategory": "games",
-    "tags": ["game", "puzzle", "2048", "base"],
+    "tags": ["game", "puzzle", "2048", "base", "crypto", "mining"],
     "heroImageUrl": "https://2048-base.vercel.app/embed.png",
-    "tagline": "Get to the 2048 tile!",
-    "ogTitle": "2048 Mini App on Base",
-    "ogDescription": "Play the classic 2048 puzzle game directly on Farcaster.",
+    "tagline": "Confirm blocks, earn rewards!",
+    "ogTitle": "2048 Mining App on Base",
+    "ogDescription": "Play the 2048 Mining App puzzle game directly on Farcaster.",
     "ogImageUrl": "https://2048-base.vercel.app/embed.png"
   }
 }

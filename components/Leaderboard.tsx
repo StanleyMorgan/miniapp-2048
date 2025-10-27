@@ -89,7 +89,7 @@ const Leaderboard: React.FC<LeaderboardProps> = ({ isReady, activeSeason }) => {
   return (
     <div className="bg-slate-600 p-4 rounded-lg w-full animate-fade-in">
       <div className="text-center text-white font-semibold mb-4 text-lg">
-        Leaderboard
+        Pool Statistics
       </div>
       <div className="flex items-center gap-2 px-3 text-sm text-slate-400 font-bold mb-2">
         <span className="w-16 text-left">Rank</span>
