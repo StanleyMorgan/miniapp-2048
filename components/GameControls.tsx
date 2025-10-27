@@ -16,7 +16,7 @@ const ScoreBox: React.FC<{ title: string; score: number }> = ({ title, score }) 
 const GameControls: React.FC<GameControlsProps> = ({ score, bestScore, onNewGame }) => {
   return (
     <div className="flex justify-end items-center w-full mb-4 px-1 gap-2">
-      <ScoreBox title="Score" score={score} />
+      <ScoreBox title="Hashrate" score={score} />
       <ScoreBox title="Peak Rate" score={bestScore} />
       <button
         onClick={onNewGame}

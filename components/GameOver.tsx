@@ -22,16 +22,16 @@ const GameOver: React.FC<GameOverProps> = ({ score, onSubmitScore, isSubmitting,
     if (activeSeason !== 'farcaster' && seasonShareName) {
       // On-chain season message
       if (userRank) {
-        text = `I just reached rank #${userRank} with a score of ${score} in the 2048 Mining App during ${seasonShareName}! Can you beat it?`;
+        text = `I just reached rank #${userRank} with a hashrate of ${score} in the 2048 Mining App during ${seasonShareName}! Can you beat it?`;
       } else {
-        text = `I just set a new high score of ${score} in the 2048 Mining App during ${seasonShareName}! Can you beat it?`;
+        text = `I just set a new peak rate of ${score} in the 2048 Mining App during ${seasonShareName}! Can you beat it?`;
       }
     } else {
       // Default Farcaster season message
       if (userRank) {
-        text = `I just reached rank #${userRank} with a score of ${score} in the 2048 Mining App! Can you beat it?`;
+        text = `I just reached rank #${userRank} with a hashrate of ${score} in the 2048 Mining App! Can you beat it?`;
       } else {
-        text = `I just set a new high score of ${score} in the 2048 Mining App! Can you beat it?`;
+        text = `I just set a new peak rate of ${score} in the 2048 Mining App! Can you beat it?`;
       }
     }
 
@@ -58,8 +58,8 @@ const GameOver: React.FC<GameOverProps> = ({ score, onSubmitScore, isSubmitting,
   return (
     <div className="absolute inset-0 bg-slate-800 bg-opacity-70 flex flex-col justify-center items-center rounded-lg animate-fade-in z-30 p-4">
       <h2 className="text-5xl font-extrabold text-white mb-2 text-center">Overload!</h2>
-      {isNewBestScore && <p className="text-xl text-orange-400 font-bold mb-1">New Best Score!</p>}
-      <p className="text-lg text-slate-300 mb-6">Your score: {score}</p>
+      {isNewBestScore && <p className="text-xl text-orange-400 font-bold mb-1">New Peak Rate!</p>}
+      <p className="text-lg text-slate-300 mb-6">Your Hashrate: {score}</p>
       <div className="flex flex-col items-center gap-2">
         <div className="flex gap-4 items-start h-[66px]">
           {/* Show "Follow" instead of the old gray "Try Again" button */}

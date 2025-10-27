@@ -123,14 +123,14 @@ export async function GET(request: Request) {
     console.log('[onchain-leaderboard] Public VIEM client created.');
     console.log('[onchain-leaderboard] Attempting to read contract...');
 
-    // FIX: The `readContract` call was failing type inference. The `args` array was being
-    // inferred as `any[]`. Using `as const` asserts it as an empty tuple `readonly []`,
-    // which allows viem to correctly match the `getLeaderboard` function signature.
+    // FIX: In some versions of viem, providing an empty `args` array for a function
+    // that takes no arguments can cause incorrect type inference, leading to errors.
+    // Omitting the `args` property entirely is the most robust way to call a
+    // parameter-less view function.
     const leaderboardData = await client.readContract({
         address: seasonConfig.address,
         abi: seasonConfig.abi,
         functionName: 'getLeaderboard',
-        args: [] as const,
     });
 
     console.log(`[onchain-leaderboard] Successfully read from contract. Raw data length: ${leaderboardData.length}`);
