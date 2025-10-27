@@ -18,7 +18,7 @@ import CountdownTimer from './components/CountdownTimer';
 const App: React.FC = () => {
   // --- Hooks must be at the top level ---
   const [touchStart, setTouchStart] = useState<{x: number, y: number} | null>(null);
-  const [activeTab, setActiveTab] = useState<'game' | 'top'>('game');
+  const [activeTab, setActiveTab] = useState<'mining' | 'stats'>('mining');
   const [activeSeason, setActiveSeason] = useState<Season>('farcaster');
   
   // --- New Robust Initialization State Management ---
@@ -103,7 +103,7 @@ const App: React.FC = () => {
   }, [wagmiStatus, chain?.id]);
 
   const handleGlobalKeyDown = useCallback((event: KeyboardEvent) => {
-    if (activeTab === 'game') {
+    if (activeTab === 'mining') {
       handleKeyDown(event);
     }
   }, [activeTab, handleKeyDown]);
@@ -286,7 +286,7 @@ const App: React.FC = () => {
         </div>
         
         <main className="flex-grow flex flex-col w-full items-center justify-center">
-          {activeTab === 'game' 
+          {activeTab === 'mining' 
             ? renderGameContent() 
             : <Leaderboard 
                 isReady={isAppReady} 
