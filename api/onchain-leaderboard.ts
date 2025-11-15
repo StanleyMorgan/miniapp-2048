@@ -122,13 +122,13 @@ export async function GET(request: Request) {
     console.log('[onchain-leaderboard] Attempting to read contract...');
 
 
+    // FIX: The `args` property was removed. For functions with no arguments, viem correctly infers
+    // this and omitting the property is the cleanest way to avoid type mismatches that can
+    // lead to misleading compiler errors (like the one about 'authorizationList').
     const leaderboardData = await client.readContract({
         address: seasonConfig.address,
         abi: seasonConfig.abi,
         functionName: 'getLeaderboard',
-        // FIX: Explicitly provide an empty args array for functions with no inputs.
-        // This helps TypeScript correctly infer the types for viem's readContract method.
-        args: [],
     });
 
     console.log(`[onchain-leaderboard] Successfully read from contract. Raw data length: ${leaderboardData.length}`);

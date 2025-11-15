@@ -8,7 +8,7 @@ import Tabs from './components/Tabs';
 import Leaderboard from './components/Leaderboard';
 import SeasonSelector, { Season, seasons } from './components/SeasonSelector';
 import RewardsDisplay from './components/RewardsDisplay';
-import { useAccount, useSwitchChain } from 'wagmi';
+import { useAccount, useSwitchChain, useConnect } from 'wagmi';
 import { onChainSeasonConfigs } from './constants/contract';
 import { useLeaderboard } from './hooks/useLeaderboard';
 import { celoS0RewardShares } from './constants/rewards';
@@ -24,6 +24,7 @@ const App: React.FC = () => {
   // --- New Robust Initialization State Management ---
   const [isSdkReady, setIsSdkReady] = useState(false);
   const { isConnected, chain, status: wagmiStatus } = useAccount();
+  const { connect, connectors } = useConnect();
   const [isAppReady, setIsAppReady] = useState(false); // This will gate the whole app
 
   const { switchChain, isPending: isSwitchingChain } = useSwitchChain();
@@ -61,19 +62,47 @@ const App: React.FC = () => {
     });
   }, []);
   
+  // Effect to automatically connect wallet on load
+  useEffect(() => {
+    // Automatically connect with the Farcaster connector when the SDK is ready.
+    // We only try to connect if the wallet is currently disconnected.
+    if (isSdkReady && wagmiStatus === 'disconnected' && connectors.length > 0 && connectors[0].id === 'farcasterMiniApp') {
+      console.log('[WAGMI] SDK ready and wallet disconnected. Attempting to auto-connect with Farcaster connector...');
+      connect({ connector: connectors[0] });
+    }
+  }, [isSdkReady, wagmiStatus, connect, connectors]);
+
+
   // Effect to determine when the entire app is ready to render.
-  // It waits for both the SDK to be ready and for wagmi to establish a stable connection status.
   useEffect(() => {
     console.log(`[APP] Readiness check: isSdkReady=${isSdkReady}, wagmiStatus=${wagmiStatus}`);
+    if (!isSdkReady) return; // Wait for SDK first.
 
-    // The app is considered ready only when the SDK is ready AND wagmi has a definitive status.
-    if (isSdkReady && (wagmiStatus === 'connected' || wagmiStatus === 'disconnected')) {
-      console.log(`[APP] App is ready. WAGMI status: ${wagmiStatus}`);
-      setIsAppReady(true);
+    // If wallet is connected, we are ready.
+    if (wagmiStatus === 'connected') {
+        console.log(`[APP] App is ready. WAGMI status: connected.`);
+        setIsAppReady(true);
+        return;
     }
-    // While wagmiStatus is 'connecting' or 'reconnecting', isAppReady remains false,
-    // and the loading screen will be displayed without reloading the page.
-  }, [isSdkReady, wagmiStatus]);
+
+    // If wallet is disconnected, check if we should auto-connect.
+    if (wagmiStatus === 'disconnected') {
+        const canAutoConnect = connectors.length > 0 && connectors[0].id === 'farcasterMiniApp';
+        if (canAutoConnect) {
+            // We are in a state where we WILL attempt to auto-connect.
+            // So, the app is NOT ready yet. The auto-connect effect will trigger.
+            console.log(`[APP] Wallet disconnected, but auto-connect is possible. Waiting for connection attempt.`);
+        } else {
+            // No auto-connect possible, so being disconnected is a final state. App is ready.
+            console.log(`[APP] App is ready. WAGMI status: disconnected (no auto-connect).`);
+            setIsAppReady(true);
+        }
+        return;
+    }
+
+    // For 'connecting' and 'reconnecting', isAppReady remains false, showing the loading screen.
+    console.log(`[APP] Waiting for connection. WAGMI status: ${wagmiStatus}`);
+  }, [isSdkReady, wagmiStatus, connectors]);
 
 
   // Log for detailed WAGMI connection status
