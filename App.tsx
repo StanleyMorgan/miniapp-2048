@@ -1,4 +1,5 @@
 
+
 import React, { useEffect, useState, useCallback } from 'react';
 import { sdk } from '@farcaster/miniapp-sdk';
 import { useGameLogic } from './hooks/useGameLogic';
@@ -187,9 +188,6 @@ const Game: React.FC<{ seasons: SeasonInfo[], activeSeason: SeasonInfo | undefin
   };
 
   const renderTimer = () => {
-    if (activeSeason.id === 'monad-s0') {
-      return <CountdownTimer dailyResetUtc={true} />;
-    }
     if (activeSeason.endDate) {
       return <CountdownTimer targetDate={activeSeason.endDate} />;
     }
