@@ -5,6 +5,9 @@ import { WagmiProvider } from 'wagmi';
 import { config } from './wagmiConfig';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 
+// The Farcaster Mini App SDK is initialized within the App component
+// to ensure proper authentication flow and context handling.
+
 // Create a client for TanStack Query
 const queryClient = new QueryClient();
 

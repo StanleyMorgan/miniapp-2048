@@ -54,13 +54,34 @@ const App: React.FC = () => {
 
   // --- Effects for Initialization and Event Handling ---
 
-  // Effect to determine when Farcaster SDK is ready
+  // PRIMARY INITIALIZATION EFFECT
+  // This effect follows the correct Farcaster Quick Auth pattern:
+  // 1. Make an authenticated fetch request to establish a session.
+  // 2. AFTER the request succeeds, call sdk.actions.ready() to signal readiness.
+  // This prevents postMessage origin errors and ensures the wallet can connect.
   useEffect(() => {
-    sdk.actions.ready().then(() => {
+    const initializeApp = async () => {
+      try {
+        console.log('[APP] Starting initialization...');
+        // Step 1: Perform an authenticated fetch. This forces the auth flow.
+        const res = await sdk.quickAuth.fetch('/api/user-info');
+        if (!res.ok) {
+          throw new Error(`User info fetch failed with status: ${res.status}`);
+        }
+        await res.json(); // We don't need the data here, just to ensure it completes.
+        console.log('[APP] Authenticated fetch successful.');
+
+        // Step 2: Now that a secure channel is established, signal readiness.
+        await sdk.actions.ready();
         console.log('[SDK] Farcaster SDK is ready.');
-        setIsSdkReady(true)
-    });
-  }, []);
+        setIsSdkReady(true);
+      } catch (error) {
+        console.error('[APP] Critical initialization failed:', error);
+        // Optionally, you could set an error state here to show a message to the user.
+      }
+    };
+    initializeApp();
+  }, []); // This effect runs only once on component mount.
   
   // Effect to automatically connect wallet on load
   useEffect(() => {
