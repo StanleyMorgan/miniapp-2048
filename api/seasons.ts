@@ -47,7 +47,16 @@ export async function GET(request: Request) {
     `;
 
     // The vercel/postgres driver returns snake_case keys. We convert them to camelCase.
-    const seasons: SeasonInfo[] = rows.map(toCamelCase);
+    const seasonsFromDb = rows.map(toCamelCase);
+
+    const seasons: SeasonInfo[] = seasonsFromDb.map(season => ({
+      ...season,
+      // The `prize_pool` column is of type NUMERIC in Postgres.
+      // The `node-postgres` driver (used by @vercel/postgres) returns NUMERIC types as strings
+      // to avoid precision loss. We need to parse it to a number for the frontend.
+      prizePool: season.prizePool !== null ? parseFloat(season.prizePool) : null,
+    }));
+
 
     return new Response(JSON.stringify(seasons), {
       status: 200,

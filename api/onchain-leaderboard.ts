@@ -123,14 +123,15 @@ export async function GET(request: Request) {
     console.log('[onchain-leaderboard] Public VIEM client created.');
     console.log('[onchain-leaderboard] Attempting to read contract...');
 
-    // FIX: Add 'as const' to the parameter object to aid TypeScript's type inference,
-    // which resolves an issue where it incorrectly requires an 'authorizationList' property.
+    // FIX: The `as const` on the parameter object was causing a type mismatch with viem's
+    // ReadContractParameters type, which does not expect readonly properties. Removing
+    // it allows TypeScript to correctly infer the parameters for a read operation.
     const leaderboardData = await client.readContract({
         address: seasonConfig.contractAddress,
         abi: LEADERBOARD_ABI,
         functionName: 'getLeaderboard',
-        args: [] as const,
-    } as const);
+        args: [],
+    });
 
     console.log(`[onchain-leaderboard] Successfully read from contract. Raw data length: ${leaderboardData.length}`);
     console.log('[onchain-leaderboard] Enriching leaderboard data with Farcaster profiles via Neynar API...');
