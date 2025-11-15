@@ -1,4 +1,5 @@
-import React, { useEffect, useState, useCallback, useRef } from 'react';
+
+import React, { useEffect, useState, useCallback } from 'react';
 import { sdk } from '@farcaster/miniapp-sdk';
 import { useGameLogic } from './hooks/useGameLogic';
 import GameBoard from './components/GameBoard';
@@ -8,29 +9,31 @@ import Tabs from './components/Tabs';
 import Leaderboard from './components/Leaderboard';
 import SeasonSelector, { Season, seasons } from './components/SeasonSelector';
 import RewardsDisplay from './components/RewardsDisplay';
-import { useAccount, useSwitchChain, useConnect } from 'wagmi';
+import { useAccount, useSwitchChain, useConnect, WagmiProvider } from 'wagmi';
+import { config } from './wagmiConfig'; // импортируем config
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query'; // импортируем провайдер
 import { onChainSeasonConfigs } from './constants/contract';
 import { useLeaderboard } from './hooks/useLeaderboard';
 import { celoS0RewardShares } from './constants/rewards';
 import InfoDisplay from './components/InfoDisplay';
 import CountdownTimer from './components/CountdownTimer';
 
-const App: React.FC = () => {
-  // --- Hooks must be at the top level ---
+// Создаем клиент для TanStack Query один раз
+const queryClient = new QueryClient();
+
+// 'Game' содержит всю логику и UI, которые зависят от провайдеров
+const Game: React.FC = () => {
   const [touchStart, setTouchStart] = useState<{x: number, y: number} | null>(null);
   const [activeTab, setActiveTab] = useState<'mining' | 'stats'>('mining');
   const [activeSeason, setActiveSeason] = useState<Season>('farcaster');
   
-  // --- New Robust Initialization State Management ---
-  const [isSdkReady, setIsSdkReady] = useState(false);
+  // Состояние готовности приложения теперь управляется здесь
+  const [isAppReady, setIsAppReady] = useState(false);
+  
   const { isConnected, chain, status: wagmiStatus } = useAccount();
   const { connect, connectors } = useConnect();
-  const [isAppReady, setIsAppReady] = useState(false); // This will gate the whole app
-
   const { switchChain, isPending: isSwitchingChain } = useSwitchChain();
 
-  // Pass `isAppReady` to the game logic hook. It will now wait for the app to be fully
-  // initialized before fetching game state, preventing race conditions.
   const { 
     tiles, 
     score, 
@@ -45,88 +48,31 @@ const App: React.FC = () => {
     hasSubmittedScore,
     wasNewBestScore,
     userRank,
-    isInitializing, // This is for game state, not app init
-    userAddress,
+    isInitializing,
     submissionStatus
   } = useGameLogic(isAppReady, activeSeason);
   
   const { data: leaderboardData, isLoading: isLeaderboardLoading } = useLeaderboard(isAppReady, activeSeason);
 
-  // --- Effects for Initialization and Event Handling ---
-
-  // PRIMARY INITIALIZATION EFFECT
-  // This effect follows the correct Farcaster Quick Auth pattern:
-  // 1. Make an authenticated fetch request to establish a session.
-  // 2. AFTER the request succeeds, call sdk.actions.ready() to signal readiness.
-  // This prevents postMessage origin errors and ensures the wallet can connect.
+  // Этот эффект теперь просто ждет, пока wagmi подключится
   useEffect(() => {
-    const initializeApp = async () => {
-      try {
-        console.log('[APP] Starting initialization...');
-        // Step 1: Perform an authenticated fetch. This forces the auth flow.
-        const res = await sdk.quickAuth.fetch('/api/user-info');
-        if (!res.ok) {
-          throw new Error(`User info fetch failed with status: ${res.status}`);
-        }
-        await res.json(); // We don't need the data here, just to ensure it completes.
-        console.log('[APP] Authenticated fetch successful.');
-
-        // Step 2: Now that a secure channel is established, signal readiness.
-        await sdk.actions.ready();
-        console.log('[SDK] Farcaster SDK is ready.');
-        setIsSdkReady(true);
-      } catch (error) {
-        console.error('[APP] Critical initialization failed:', error);
-        // Optionally, you could set an error state here to show a message to the user.
-      }
-    };
-    initializeApp();
-  }, []); // This effect runs only once on component mount.
+    console.log(`[APP] Readiness check: wagmiStatus=${wagmiStatus}`);
+    if (wagmiStatus === 'connected' || wagmiStatus === 'disconnected') {
+      console.log(`[APP] App is ready. WAGMI status: ${wagmiStatus}.`);
+      setIsAppReady(true);
+    } else {
+      console.log(`[APP] Waiting for connection. WAGMI status: ${wagmiStatus}`);
+    }
+  }, [wagmiStatus]);
   
-  // Effect to automatically connect wallet on load
+  // Эффект для автоматического подключения кошелька
   useEffect(() => {
-    // Automatically connect with the Farcaster connector when the SDK is ready.
-    // We only try to connect if the wallet is currently disconnected.
-    if (isSdkReady && wagmiStatus === 'disconnected' && connectors.length > 0 && connectors[0].id === 'farcasterMiniApp') {
-      console.log('[WAGMI] SDK ready and wallet disconnected. Attempting to auto-connect with Farcaster connector...');
+    if (wagmiStatus === 'disconnected' && connectors.length > 0 && connectors[0].id === 'farcasterMiniApp') {
+      console.log('[WAGMI] Wallet disconnected. Attempting to auto-connect with Farcaster connector...');
       connect({ connector: connectors[0] });
     }
-  }, [isSdkReady, wagmiStatus, connect, connectors]);
-
-
-  // Effect to determine when the entire app is ready to render.
-  useEffect(() => {
-    console.log(`[APP] Readiness check: isSdkReady=${isSdkReady}, wagmiStatus=${wagmiStatus}`);
-    if (!isSdkReady) return; // Wait for SDK first.
-
-    // If wallet is connected, we are ready.
-    if (wagmiStatus === 'connected') {
-        console.log(`[APP] App is ready. WAGMI status: connected.`);
-        setIsAppReady(true);
-        return;
-    }
-
-    // If wallet is disconnected, check if we should auto-connect.
-    if (wagmiStatus === 'disconnected') {
-        const canAutoConnect = connectors.length > 0 && connectors[0].id === 'farcasterMiniApp';
-        if (canAutoConnect) {
-            // We are in a state where we WILL attempt to auto-connect.
-            // So, the app is NOT ready yet. The auto-connect effect will trigger.
-            console.log(`[APP] Wallet disconnected, but auto-connect is possible. Waiting for connection attempt.`);
-        } else {
-            // No auto-connect possible, so being disconnected is a final state. App is ready.
-            console.log(`[APP] App is ready. WAGMI status: disconnected (no auto-connect).`);
-            setIsAppReady(true);
-        }
-        return;
-    }
-
-    // For 'connecting' and 'reconnecting', isAppReady remains false, showing the loading screen.
-    console.log(`[APP] Waiting for connection. WAGMI status: ${wagmiStatus}`);
-  }, [isSdkReady, wagmiStatus, connectors]);
-
-
-  // Log for detailed WAGMI connection status
+  }, [wagmiStatus, connect, connectors]);
+  
   useEffect(() => {
     console.log(`[WAGMI] Connection status changed to: ${wagmiStatus}. ChainID: ${chain?.id}`);
   }, [wagmiStatus, chain?.id]);
@@ -137,11 +83,8 @@ const App: React.FC = () => {
     }
   }, [activeTab, handleKeyDown]);
 
-  // Effect to automatically switch network when an on-chain season is selected
   useEffect(() => {
-    // This crucial effect will now only run when the app is fully ready.
     if (!isAppReady) return;
-
     const seasonConfig = onChainSeasonConfigs[activeSeason as keyof typeof onChainSeasonConfigs];
     if (isConnected && seasonConfig && chain?.id !== seasonConfig.chainId && switchChain && !isSwitchingChain) {
       console.log(`[ONCHAIN] Requesting network switch from chain ${chain?.id} to ${seasonConfig.chainId} for season ${activeSeason}`);
@@ -167,36 +110,25 @@ const App: React.FC = () => {
       setTouchStart(null);
       return;
     }
-
     const touchEnd = { x: e.changedTouches[0].clientX, y: e.changedTouches[0].clientY };
     const dx = touchEnd.x - touchStart.x;
     const dy = touchEnd.y - touchStart.y;
-    const minSwipeDistance = 40; // Minimum distance for a swipe to be registered
-
-    if (Math.abs(dx) > Math.abs(dy)) { // Horizontal swipe
-      if (Math.abs(dx) > minSwipeDistance) {
-        performMove(dx > 0 ? 'right' : 'left');
-      }
-    } else { // Vertical swipe
-      if (Math.abs(dy) > minSwipeDistance) {
-        performMove(dy > 0 ? 'down' : 'up');
-      }
+    const minSwipeDistance = 40;
+    if (Math.abs(dx) > Math.abs(dy)) {
+      if (Math.abs(dx) > minSwipeDistance) performMove(dx > 0 ? 'right' : 'left');
+    } else {
+      if (Math.abs(dy) > minSwipeDistance) performMove(dy > 0 ? 'down' : 'up');
     }
-
     setTouchStart(null);
   };
   
   const displayBestScore = serverBestScore !== null ? serverBestScore : bestScore;
 
-  // --- Render Logic ---
-
-  // Render a global initializing screen until the app is ready.
   if (!isAppReady) {
-    let loadingMessage = 'Initializing...';
-    if (isSdkReady && (wagmiStatus === 'connecting' || wagmiStatus === 'reconnecting')) {
+    let loadingMessage = 'Connecting...';
+    if (wagmiStatus === 'connecting' || wagmiStatus === 'reconnecting') {
       loadingMessage = 'Connecting wallet...';
     }
-    
     return (
       <div className="min-h-screen w-screen flex flex-col items-center justify-center">
         <div className="animate-pulse text-slate-400">{loadingMessage}</div>
@@ -205,7 +137,6 @@ const App: React.FC = () => {
   }
 
   const renderGameContent = () => {
-    // This `isInitializing` is for loading the specific game state for a season.
     if (isInitializing) {
       return (
         <div className="flex-grow flex flex-col items-center justify-center">
@@ -216,12 +147,11 @@ const App: React.FC = () => {
     return (
       <div 
         className="w-full flex flex-col items-center animate-fade-in"
-        style={{ touchAction: 'none' }} // Prevents browser from scrolling on touch devices
+        style={{ touchAction: 'none' }}
         onTouchStart={handleTouchStart}
         onTouchEnd={handleTouchEnd}
       >
         <GameControls score={score} bestScore={displayBestScore} onNewGame={newGame} />
-        
         <div className="relative w-full">
           <GameBoard tiles={tiles} />
           {isGameOver && (
@@ -245,37 +175,22 @@ const App: React.FC = () => {
   const celoEndDate = '2025-12-01T00:00:00Z';
 
   const calculateYourRewards = () => {
-    if (activeSeason === 'farcaster') {
-      return '****';
-    }
-    
-    if (isLeaderboardLoading || !leaderboardData || !['celo-s0', 'monad-s0', 'base-s0'].includes(activeSeason) || !activeSeasonData?.prize) {
-        return null;
-    }
-
+    if (activeSeason === 'farcaster') return '****';
+    if (isLeaderboardLoading || !leaderboardData || !['celo-s0', 'monad-s0', 'base-s0'].includes(activeSeason) || !activeSeasonData?.prize) return null;
     const currentUserEntry = leaderboardData.find(entry => entry.isCurrentUser);
-    if (!currentUserEntry || !currentUserEntry.rank) {
-        return null;
-    }
-
+    if (!currentUserEntry || !currentUserEntry.rank) return null;
     const rank = currentUserEntry.rank;
     const totalPlayers = leaderboardData.length;
     let effectiveRank = rank;
-
-    // For early players, calculate rewards as if they are the last N players in the top 100.
-    // Example: 3 players (ranks 1, 2, 3) get rewards for ranks 98, 99, 100.
     if (totalPlayers > 0 && totalPlayers < 100) {
       effectiveRank = 100 - totalPlayers + rank;
     }
-
     if (effectiveRank > 0 && effectiveRank <= celoS0RewardShares.length) {
-        const share = celoS0RewardShares[effectiveRank - 1];
-        const reward = activeSeasonData.prize * share;
-        // Format to 5 decimal places if it's not an integer to show small rewards
-        const formattedReward = reward.toFixed(reward % 1 === 0 ? 0 : 5);
-        return <><span className="text-orange-400">{formattedReward}</span><span className="text-white ml-1">{activeSeasonData.prizeUnit}</span></>;
+      const share = celoS0RewardShares[effectiveRank - 1];
+      const reward = activeSeasonData.prize * share;
+      const formattedReward = reward.toFixed(reward % 1 === 0 ? 0 : 5);
+      return <><span className="text-orange-400">{formattedReward}</span><span className="text-white ml-1">{activeSeasonData.prizeUnit}</span></>;
     }
-
     return null;
   };
 
@@ -293,7 +208,6 @@ const App: React.FC = () => {
     <div className="min-h-screen w-screen text-white flex flex-col items-center p-4 font-sans">
       <div className="w-full sm:max-w-md mx-auto flex flex-col flex-grow">
         <Tabs activeTab={activeTab} onTabChange={setActiveTab} />
-        
         <div className="flex flex-col w-full gap-2 mb-4">
           <div className="flex w-full gap-2 items-stretch">
             <div className="flex-1">
@@ -305,30 +219,61 @@ const App: React.FC = () => {
           </div>
           <div className="flex w-full gap-2 items-stretch">
               <div className="flex-1">
-                  <InfoDisplay 
-                      title="⏳" 
-                      value={renderTimer()} 
-                  />
+                  <InfoDisplay title="⏳" value={renderTimer()} />
               </div>
               <div className="flex-1">
-                  <InfoDisplay 
-                      title="🏆" 
-                      value={calculateYourRewards()} 
-                  />
+                  <InfoDisplay title="🏆" value={calculateYourRewards()} />
               </div>
           </div>
         </div>
-        
         <main className="flex-grow flex flex-col w-full items-center justify-center">
           {activeTab === 'mining' 
             ? renderGameContent() 
-            : <Leaderboard 
-                isReady={isAppReady} 
-                activeSeason={activeSeason} 
-              />}
+            : <Leaderboard isReady={isAppReady} activeSeason={activeSeason} />}
         </main>
       </div>
     </div>
+  );
+};
+
+// 'App' теперь является оберткой, которая управляет инициализацией SDK
+const App: React.FC = () => {
+  const [isSdkInitialized, setIsSdkInitialized] = useState(false);
+
+  useEffect(() => {
+    const initializeApp = async () => {
+      try {
+        console.log('[SDK] Starting Farcaster SDK initialization...');
+        const res = await sdk.quickAuth.fetch('/api/user-info');
+        if (!res.ok) throw new Error(`User info fetch failed: ${res.status}`);
+        await res.json();
+        console.log('[SDK] Authenticated fetch successful.');
+        await sdk.actions.ready();
+        console.log('[SDK] Farcaster SDK is ready.');
+        setIsSdkInitialized(true);
+      } catch (error) {
+        console.error('[SDK] Critical initialization failed:', error);
+      }
+    };
+    initializeApp();
+  }, []);
+
+  // Рендерим загрузчик, пока SDK не готов
+  if (!isSdkInitialized) {
+    return (
+      <div className="min-h-screen w-screen flex flex-col items-center justify-center">
+        <div className="animate-pulse text-slate-400">Initializing...</div>
+      </div>
+    );
+  }
+
+  // Только после готовности SDK мы рендерим провайдеры и основное приложение
+  return (
+    <QueryClientProvider client={queryClient}>
+      <WagmiProvider config={config}>
+        <Game />
+      </WagmiProvider>
+    </QueryClientProvider>
   );
 };
 
