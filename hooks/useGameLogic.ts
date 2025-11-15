@@ -1,7 +1,8 @@
+
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { sdk } from '@farcaster/miniapp-sdk';
 import { useAccount, useConnect, useWriteContract, useWaitForTransactionReceipt, useReadContract, useSwitchChain } from 'wagmi';
-import type { TileData } from '../types';
+import type { TileData, SeasonInfo } from '../types';
 import {
   generateInitialTiles,
   move,
@@ -12,18 +13,13 @@ import {
   sha256,
   hexToUint8Array,
 } from '../utils/gridUtils';
-import { Season } from '../components/SeasonSelector';
-import { 
-    LEADERBOARD_ABI,
-    onChainSeasonConfigs
-} from '../constants/contract';
-
+import { LEADERBOARD_ABI } from '../constants/contract';
 
 const BEST_SCORE_KEY = 'bestScore2048';
 const ANIMATION_DURATION = 200;
 const INITIAL_MOVES_HASH = '0x' + '0'.repeat(64);
 
-export const useGameLogic = (isSdkReady: boolean, activeSeason: Season) => {
+export const useGameLogic = (isAppReady: boolean, activeSeason: SeasonInfo | undefined) => {
   const [isInitializing, setIsInitializing] = useState(true);
   const [userAddress, setUserAddress] = useState<string | null>(null);
   const [tiles, setTiles] = useState<TileData[]>([]);
@@ -45,7 +41,7 @@ export const useGameLogic = (isSdkReady: boolean, activeSeason: Season) => {
   const gameIdRef = useRef(0);
   const newGameLoadingRef = useRef(false);
   const userAddressRef = useRef(userAddress);
-  const seasonTransitionRef = useRef(false); // Ref to prevent saving during season transitions
+  const seasonTransitionRef = useRef(false);
 
   useEffect(() => {
     userAddressRef.current = userAddress;
@@ -57,39 +53,32 @@ export const useGameLogic = (isSdkReady: boolean, activeSeason: Season) => {
   const [moves, setMoves] = useState<number[]>([]);
   const [finalMovesHash, setFinalMovesHash] = useState<string>(INITIAL_MOVES_HASH);
   const [prng, setPrng] = useState<SeededRandom | null>(null);
-
-  // Get the config for the current season, if it's an on-chain one
-  const activeSeasonConfig = activeSeason in onChainSeasonConfigs ? onChainSeasonConfigs[activeSeason as keyof typeof onChainSeasonConfigs] : undefined;
-
-  // --- WAGMI HOOKS FOR ON-CHAIN INTERACTION ---
+  
   const { address: wagmiAddress, isConnected, chain } = useAccount();
   const { connect, connectors } = useConnect();
   const { switchChain } = useSwitchChain();
   const { data: hash, writeContract, isPending, error: writeContractError } = useWriteContract();
   const { isLoading: isConfirming, isSuccess: isConfirmed, error: txReceiptError } = useWaitForTransactionReceipt({ hash });
   
-  const isBestScoreQueryEnabled = isSdkReady && !!userAddress && !!activeSeasonConfig && isConnected && chain?.id === activeSeasonConfig.chainId;
+  const isBestScoreQueryEnabled = isAppReady && !!userAddress && !!activeSeason?.contractAddress && isConnected && chain?.id === activeSeason.chainId;
 
-  // New detailed log for query state
   useEffect(() => {
-    if (activeSeasonConfig) {
-        console.log(`[DEBUG] Best Score Query State for season '${activeSeason}':`, {
-            isSdkReady: isSdkReady,
+    if (activeSeason?.contractAddress) {
+        console.log(`[DEBUG] Best Score Query State for season '${activeSeason.id}':`, {
+            isAppReady: isAppReady,
             hasUserAddress: !!userAddress,
             isWalletConnected: isConnected,
             currentChainId: chain?.id,
-            expectedChainId: activeSeasonConfig.chainId,
-            isCorrectChain: chain?.id === activeSeasonConfig.chainId,
+            expectedChainId: activeSeason.chainId,
+            isCorrectChain: chain?.id === activeSeason.chainId,
             isQueryEnabled: isBestScoreQueryEnabled,
         });
     }
-  }, [isSdkReady, userAddress, isConnected, chain?.id, activeSeason, activeSeasonConfig, isBestScoreQueryEnabled]);
+  }, [isAppReady, userAddress, isConnected, chain?.id, activeSeason, isBestScoreQueryEnabled]);
   
-  // FIX: `onSuccess` and `onError` callbacks are deprecated in wagmi/TanStack Query v5.
-  // Replaced with `useEffect` to handle side-effects like logging.
   const { data: onChainResult, error: onChainResultError } = useReadContract({
-    address: activeSeasonConfig?.address,
-    abi: activeSeasonConfig?.abi,
+    address: activeSeason?.contractAddress,
+    abi: LEADERBOARD_ABI,
     functionName: 'results',
     args: [userAddress as `0x${string}`],
     query: {
@@ -97,28 +86,25 @@ export const useGameLogic = (isSdkReady: boolean, activeSeason: Season) => {
     }
   });
 
-  // Log on-chain score fetch status
   useEffect(() => {
     if (onChainResult) {
       const score = onChainResult?.[1];
-      console.log(`[ONCHAIN] Successfully fetched best score for ${userAddress} on season ${activeSeason}: ${score}`);
+      console.log(`[ONCHAIN] Successfully fetched best score for ${userAddress} on season ${activeSeason?.id}: ${score}`);
     }
     if (onChainResultError) {
-      console.error(`[ONCHAIN] Error fetching best score for ${userAddress} on season ${activeSeason}:`, onChainResultError);
+      console.error(`[ONCHAIN] Error fetching best score for ${userAddress} on season ${activeSeason?.id}:`, onChainResultError);
     }
   }, [onChainResult, onChainResultError, userAddress, activeSeason]);
 
-  // Effect to switch the displayed server best score based on the active season
   useEffect(() => {
-    if (activeSeasonConfig) {
-      const onChainScore = onChainResult?.[1]; // score is at index 1
+    if (activeSeason?.contractAddress) {
+      const onChainScore = onChainResult?.[1];
       setServerBestScore(typeof onChainScore === 'bigint' ? Number(onChainScore) : 0);
     } else {
       setServerBestScore(farcasterBestScore);
     }
-  }, [activeSeason, onChainResult, farcasterBestScore, activeSeasonConfig]);
+  }, [activeSeason, onChainResult, farcasterBestScore]);
 
-  // Effect to manage submission status based on wagmi state changes
   useEffect(() => {
     if (isPending) {
       setSubmissionStatus('Confirm in your wallet...');
@@ -140,8 +126,6 @@ export const useGameLogic = (isSdkReady: boolean, activeSeason: Season) => {
     }
   }, [isPending, isConfirming, isConfirmed, writeContractError, txReceiptError, hash]);
   
-  // When a game ends, check if it was a new best score and latch the state.
-  // This state persists across reloads to ensure the "Share" button is shown correctly.
   useEffect(() => {
     if (isGameOver && !wasNewBestScore) {
       const currentBest = serverBestScore ?? bestScore;
@@ -211,11 +195,10 @@ export const useGameLogic = (isSdkReady: boolean, activeSeason: Season) => {
     }
   }, []);
 
-  // Main initialization effect. This is the orchestrator for loading games when the season changes.
   useEffect(() => {
-    if (!isSdkReady) return;
+    if (!isAppReady || !activeSeason) return;
 
-    seasonTransitionRef.current = true; // Set flag to block saving during transition
+    seasonTransitionRef.current = true;
     
     setIsInitializing(true);
     setTiles([]);
@@ -224,7 +207,6 @@ export const useGameLogic = (isSdkReady: boolean, activeSeason: Season) => {
     setIsWon(false);
 
     const initializeGameForSeason = async () => {
-      // Fetch user data and best scores. This can happen while we prepare the game board.
       try {
         const res = await sdk.quickAuth.fetch('/api/user-info');
         if (res.ok) {
@@ -250,7 +232,7 @@ export const useGameLogic = (isSdkReady: boolean, activeSeason: Season) => {
         setFarcasterBestScore(null);
       }
       
-      const GAME_STATE_KEY = `gameState2048_${activeSeason}`;
+      const GAME_STATE_KEY = `gameState2048_${activeSeason.id}`;
       const savedStateJSON = localStorage.getItem(GAME_STATE_KEY);
       let loadedFromSave = false;
 
@@ -279,11 +261,11 @@ export const useGameLogic = (isSdkReady: boolean, activeSeason: Season) => {
             tileIdCounterRef.current = maxId + 1;
             loadedFromSave = true;
           } else {
-            console.warn(`[MainEffect] Found invalid saved state for ${activeSeason}. Discarding.`);
+            console.warn(`[MainEffect] Found invalid saved state for ${activeSeason.id}. Discarding.`);
             localStorage.removeItem(GAME_STATE_KEY);
           }
         } catch (e) {
-          console.error(`[MainEffect] Failed to parse saved state for ${activeSeason}, starting new game.`, e);
+          console.error(`[MainEffect] Failed to parse saved state for ${activeSeason.id}, starting new game.`, e);
           localStorage.removeItem(GAME_STATE_KEY);
         }
       }
@@ -300,16 +282,15 @@ export const useGameLogic = (isSdkReady: boolean, activeSeason: Season) => {
     };
 
     initializeGameForSeason();
-  }, [isSdkReady, activeSeason]);
+  }, [isAppReady, activeSeason]);
   
-  // Game state saving effect
   useEffect(() => {
-    if (seasonTransitionRef.current) return;
+    if (seasonTransitionRef.current || !activeSeason) return;
 
     const shouldSave = !isInitializing && tiles.length > 0 && seed;
 
     if (shouldSave) {
-      const GAME_STATE_KEY = `gameState2048_${activeSeason}`;
+      const GAME_STATE_KEY = `gameState2048_${activeSeason.id}`;
       const gameState = { tiles, score, isGameOver, isWon, seed, startTime, moves, randomness, finalMovesHash, hasSubmittedScore, wasNewBestScore };
       localStorage.setItem(GAME_STATE_KEY, JSON.stringify(gameState));
     }
@@ -324,14 +305,13 @@ export const useGameLogic = (isSdkReady: boolean, activeSeason: Season) => {
 
 
   const submitScore = useCallback(async () => {
-    if (hasSubmittedScore || isSubmitting) return;
+    if (hasSubmittedScore || isSubmitting || !activeSeason) return;
     setIsSubmitting(true);
     
-    // Check if the current season is an on-chain season
-    if (activeSeasonConfig) {
+    if (activeSeason.contractAddress) {
       try {
-        if (!activeSeasonConfig.address || activeSeasonConfig.address.startsWith('0xYour')) {
-          throw new Error(`Contract address is not configured for ${activeSeasonConfig.chainName}.`);
+        if (activeSeason.contractAddress.startsWith('0xYour')) {
+          throw new Error(`Contract address is not configured for ${activeSeason.chainName}.`);
         }
         if (!seed || !randomness || !userAddress || !startTime || !finalMovesHash) {
           throw new Error("Missing critical game data for on-chain submission.");
@@ -349,10 +329,10 @@ export const useGameLogic = (isSdkReady: boolean, activeSeason: Season) => {
            throw new Error(`Wallet mismatch. Please connect with ${userAddress.slice(0,6)}...${userAddress.slice(-4)}`);
         }
 
-        if (chain?.id !== activeSeasonConfig.chainId) {
-          console.log(`[ONCHAIN] Incorrect network. Current: ${chain?.id}, Required: ${activeSeasonConfig.chainId}. Requesting switch.`);
-          setSubmissionStatus(`Switching to ${activeSeasonConfig.chainName}...`);
-          switchChain({ chainId: activeSeasonConfig.chainId }, {
+        if (chain?.id !== activeSeason.chainId) {
+          console.log(`[ONCHAIN] Incorrect network. Current: ${chain?.id}, Required: ${activeSeason.chainId}. Requesting switch.`);
+          setSubmissionStatus(`Switching to ${activeSeason.chainName}...`);
+          switchChain({ chainId: activeSeason.chainId! }, {
             onSuccess: () => {
               console.log('[ONCHAIN] Network switch successful.');
               setSubmissionStatus(`Network switched. Please "Confirm Blocks" again.`);
@@ -360,7 +340,7 @@ export const useGameLogic = (isSdkReady: boolean, activeSeason: Season) => {
             },
             onError: (error) => {
               console.error("[ONCHAIN] Failed to switch network:", error);
-              setSubmissionStatus(`Please switch to ${activeSeasonConfig.chainName} in your wallet.`);
+              setSubmissionStatus(`Please switch to ${activeSeason.chainName} in your wallet.`);
               setIsSubmitting(false);
             }
           });
@@ -369,8 +349,6 @@ export const useGameLogic = (isSdkReady: boolean, activeSeason: Season) => {
 
         const packedBoard = packBoard(tiles);
         const endTime = Date.now();
-        // FIX: Add `as const` to ensure TypeScript infers a tuple type, not an array type.
-        // This is required by wagmi/viem for type-safe contract calls.
         const args = [
             BigInt(packedBoard),
             BigInt(score),
@@ -381,7 +359,7 @@ export const useGameLogic = (isSdkReady: boolean, activeSeason: Season) => {
             finalMovesHash as `0x${string}`
         ] as const;
         
-        console.log(`[ONCHAIN] Preparing to submit score to ${activeSeasonConfig.address} on chain ${activeSeasonConfig.chainId}.`);
+        console.log(`[ONCHAIN] Preparing to submit score to ${activeSeason.contractAddress} on chain ${activeSeason.chainId}.`);
         console.log('[ONCHAIN] Submission args:', {
             packedBoard: '0x' + BigInt(packedBoard).toString(16),
             score,
@@ -393,8 +371,8 @@ export const useGameLogic = (isSdkReady: boolean, activeSeason: Season) => {
         });
 
         writeContract({
-          address: activeSeasonConfig.address,
-          abi: activeSeasonConfig.abi,
+          address: activeSeason.contractAddress,
+          abi: LEADERBOARD_ABI,
           functionName: 'submitGame',
           args: args,
           account: wagmiAddress,
@@ -409,7 +387,6 @@ export const useGameLogic = (isSdkReady: boolean, activeSeason: Season) => {
       return;
     }
 
-    // --- Original Farcaster leaderboard submission logic ---
     try {
       const res = await sdk.quickAuth.fetch('/api/submit-score', {
         method: 'POST',
@@ -441,7 +418,7 @@ export const useGameLogic = (isSdkReady: boolean, activeSeason: Season) => {
     } finally {
       setIsSubmitting(false);
     }
-  }, [score, hasSubmittedScore, isSubmitting, activeSeasonConfig, tiles, seed, startTime, randomness, finalMovesHash, userAddress, isConnected, wagmiAddress, connect, connectors, writeContract, chain, activeSeason, switchChain]);
+  }, [score, hasSubmittedScore, isSubmitting, activeSeason, tiles, seed, startTime, randomness, finalMovesHash, userAddress, isConnected, wagmiAddress, connect, connectors, writeContract, chain, switchChain]);
 
   const performMove = useCallback(async (direction: 'up' | 'down' | 'left' | 'right') => {
     if (isGameOver || isMoving || !prng || !finalMovesHash) return;

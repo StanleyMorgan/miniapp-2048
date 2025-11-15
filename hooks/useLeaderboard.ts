@@ -1,21 +1,15 @@
+
 import { useState, useEffect } from 'react';
 import { sdk } from '@farcaster/miniapp-sdk';
-import { Season } from '../components/SeasonSelector';
-import { onChainSeasonConfigs } from '../constants/contract';
-import type { LeaderboardEntry } from '../types';
+import type { SeasonInfo, LeaderboardEntry } from '../types';
 
-// Type guard to check if a season is an on-chain season
-export const isOnChainSeason = (season: Season): season is keyof typeof onChainSeasonConfigs => {
-  return onChainSeasonConfigs.hasOwnProperty(season);
-};
-
-export const useLeaderboard = (isReady: boolean, activeSeason: Season) => {
+export const useLeaderboard = (isReady: boolean, activeSeasonId: string | null) => {
   const [data, setData] = useState<LeaderboardEntry[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!isReady) return;
+    if (!isReady || !activeSeasonId) return;
 
     const fetchLeaderboard = async () => {
       setIsLoading(true);
@@ -23,9 +17,14 @@ export const useLeaderboard = (isReady: boolean, activeSeason: Season) => {
       setData([]);
 
       try {
+        // We determine the endpoint based on the season ID format.
+        // This is a simplification. A better way is to pass the full SeasonInfo object.
+        // For now, we assume non-'farcaster' seasons are on-chain.
+        const isOnChain = activeSeasonId !== 'farcaster';
         let url: string;
-        if (isOnChainSeason(activeSeason)) {
-          url = `/api/onchain-leaderboard?season=${activeSeason}`;
+        
+        if (isOnChain) {
+          url = `/api/onchain-leaderboard?season=${activeSeasonId}`;
         } else {
           url = '/api/leaderboard';
         }
@@ -44,7 +43,7 @@ export const useLeaderboard = (isReady: boolean, activeSeason: Season) => {
         const responseData: LeaderboardEntry[] = await response.json();
         setData(responseData);
       } catch (err: any) {
-        console.error(`Failed to fetch leaderboard for season '${activeSeason}':`, err);
+        console.error(`Failed to fetch leaderboard for season '${activeSeasonId}':`, err);
         setError('Could not load pool statistics. Please try again later.');
       } finally {
         setIsLoading(false);
@@ -52,7 +51,7 @@ export const useLeaderboard = (isReady: boolean, activeSeason: Season) => {
     };
 
     fetchLeaderboard();
-  }, [isReady, activeSeason]);
+  }, [isReady, activeSeasonId]);
 
   return { data, isLoading, error };
 };

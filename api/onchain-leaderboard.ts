@@ -1,14 +1,11 @@
 
-
-
 import { createPublicClient, http, defineChain, type Chain } from 'viem';
-// FIX: Added .js extension, which is mandatory for module resolution in Vercel's Node.js environment.
-import { onChainSeasonConfigs } from '../constants/contract.js';
+import { LEADERBOARD_ABI } from '../constants/contract.js';
 import { createClient, Errors } from '@farcaster/quick-auth';
+import type { SeasonInfo } from '../types';
 
 export const dynamic = 'force-dynamic';
 
-// Define chains for viem client, mirroring wagmiConfig.ts
 const monad = defineChain({
   id: 10143,
   name: 'Monad Testnet',
@@ -36,7 +33,6 @@ const celo = defineChain({
   },
 });
 
-// FIX: Correctly type the chains object to ensure proper type inference by viem's createPublicClient.
 const chains: { [key: number]: Chain } = {
   [monad.id]: monad,
   [base.id]: base,
@@ -51,27 +47,38 @@ type LeaderboardEntry = {
   isCurrentUser?: boolean;
 };
 
-// Helper to format address for display
 const formatAddress = (address: string) => `${address.slice(0, 6)}...${address.slice(-4)}`;
 
 export async function GET(request: Request) {
-  const { searchParams } = new URL(request.url);
-  const season = searchParams.get('season') as keyof typeof onChainSeasonConfigs | null;
+  const url = new URL(request.url);
+  const { searchParams } = url;
+  const seasonId = searchParams.get('season');
 
-  console.log(`[onchain-leaderboard] Received request for season: ${season}`);
+  console.log(`[onchain-leaderboard] Received request for season: ${seasonId}`);
 
-  if (!season || !onChainSeasonConfigs[season]) {
-    return new Response(JSON.stringify({ message: 'Invalid or missing season parameter' }), {
+  if (!seasonId) {
+    return new Response(JSON.stringify({ message: 'Missing season parameter' }), { status: 400 });
+  }
+  
+  // Fetch season config from our new seasons API
+  // Construct the absolute URL for the seasons API endpoint
+  const seasonsApiUrl = new URL('/api/seasons', url.origin);
+  const seasonsResponse = await fetch(seasonsApiUrl.toString());
+  if (!seasonsResponse.ok) {
+    throw new Error('Failed to fetch seasons configuration');
+  }
+  const allSeasons: SeasonInfo[] = await seasonsResponse.json();
+  const seasonConfig = allSeasons.find(s => s.id === seasonId);
+
+
+  if (!seasonConfig || !seasonConfig.contractAddress || !seasonConfig.chainId) {
+    return new Response(JSON.stringify({ message: 'Invalid or non-onchain season specified' }), {
       status: 400,
       headers: { 'Content-Type': 'application/json' },
     });
   }
+  console.log('[onchain-leaderboard] Found season config:', { address: seasonConfig.contractAddress, chainId: seasonConfig.chainId });
 
-  const seasonConfig = onChainSeasonConfigs[season];
-  console.log('[onchain-leaderboard] Found season config:', { address: seasonConfig.address, chainId: seasonConfig.chainId });
-
-
-  // --- Handle Authentication to identify current user ---
   const quickAuthClient = createClient();
   const authorization = request.headers.get('Authorization');
   let currentUserAddress: string | null = null;
@@ -85,13 +92,8 @@ export async function GET(request: Request) {
     const domain = host;
     
     try {
-      interface CustomJWTPayload {
-        sub: number;
-        [key: string]: unknown;
-      }
-
-      const payload = (await quickAuthClient.verifyJwt({ token, domain })) as CustomJWTPayload;
-      const fid = payload.sub;
+      const payload = await quickAuthClient.verifyJwt({ token, domain });
+      const fid = Number(payload.sub);
 
       const addressResponse = await fetch(`https://api.farcaster.xyz/fc/primary-address?fid=${fid}&protocol=ethereum`);
       if (addressResponse.ok) {
@@ -117,35 +119,27 @@ export async function GET(request: Request) {
     }
     console.log(`[onchain-leaderboard] Mapped to chain: ${chain.name}`);
 
-    const client = createPublicClient({
-      chain: chain,
-      transport: http(),
-    });
+    const client = createPublicClient({ chain: chain, transport: http() });
     console.log('[onchain-leaderboard] Public VIEM client created.');
     console.log('[onchain-leaderboard] Attempting to read contract...');
 
-
-    // FIX: Explicitly providing an empty `args` array as a const tuple (`[] as const`)
-    // resolves the viem type error for functions with no arguments. The misleading error
-    // about 'authorizationList' is a symptom of a type mismatch.
+    // FIX: Add 'as const' to the parameter object to aid TypeScript's type inference,
+    // which resolves an issue where it incorrectly requires an 'authorizationList' property.
     const leaderboardData = await client.readContract({
-        address: seasonConfig.address,
-        abi: seasonConfig.abi,
+        address: seasonConfig.contractAddress,
+        abi: LEADERBOARD_ABI,
         functionName: 'getLeaderboard',
-        // In viem, functions with no arguments still require an empty `args` array.
         args: [] as const,
-    });
+    } as const);
 
     console.log(`[onchain-leaderboard] Successfully read from contract. Raw data length: ${leaderboardData.length}`);
     console.log('[onchain-leaderboard] Enriching leaderboard data with Farcaster profiles via Neynar API...');
 
-    // --- NEYNAR BATCH ENRICHMENT LOGIC ---
     const neynarApiKey = process.env.NEYNAR_API_KEY;
     if (!neynarApiKey) {
       console.error('[Enrichment] NEYNAR_API_KEY is not set. Cannot fetch user profiles.');
       return new Response(JSON.stringify({ message: 'Server configuration error: NEYNAR_API_KEY is missing.' }), {
-        status: 500,
-        headers: { 'Content-Type': 'application/json' },
+        status: 500
       });
     }
 
@@ -158,23 +152,19 @@ export async function GET(request: Request) {
         const neynarUrl = `https://api.neynar.com/v2/farcaster/user/bulk-by-address?addresses=${addressesString}`;
 
         const userResponse = await fetch(neynarUrl, {
-          headers: {
-            'accept': 'application/json',
-            'api_key': neynarApiKey,
-          },
+          headers: { 'accept': 'application/json', 'api_key': neynarApiKey },
         });
         
         console.log(`[Enrichment] Neynar API response status: ${userResponse.status}`);
 
         if (userResponse.ok) {
           const userData = await userResponse.json();
-          // The response format is { "0x...": [user], ... }
           for (const address in userData) {
             const userArray = userData[address];
             if (userArray && userArray.length > 0) {
               const user = userArray[0];
               userProfileMap.set(address.toLowerCase(), {
-                displayName: user.username, // Use username for consistency with the Farcaster leaderboard
+                displayName: user.username,
                 fid: user.fid,
               });
               console.log(`[Enrichment] Found profile for ${address}: ${user.username}`);
@@ -194,7 +184,7 @@ export async function GET(request: Request) {
         const profile = userProfileMap.get(address);
 
         return {
-          rank: 0, // Will be set after sorting
+          rank: 0,
           displayName: profile ? profile.displayName : formatAddress(entry.player),
           fid: profile ? profile.fid : null,
           score: Number(entry.score),
@@ -213,7 +203,7 @@ export async function GET(request: Request) {
     });
 
   } catch (error) {
-    console.error(`[onchain-leaderboard] Error fetching on-chain leaderboard for season ${season}:`, error);
+    console.error(`[onchain-leaderboard] Error fetching on-chain leaderboard for season ${seasonId}:`, error);
     const errorResponse = { message: 'Error fetching leaderboard data from the blockchain.' };
     return new Response(JSON.stringify(errorResponse), {
       status: 500,

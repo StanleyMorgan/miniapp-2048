@@ -1,10 +1,7 @@
 
 import React from 'react';
 import ReactDOM from 'react-dom/client';
-import App from './App';
-
-// Провайдеры перенесены в App.tsx для отложенной инициализации.
-// Это ключевое исправление для предотвращения гонки состояний с Farcaster SDK.
+import AppWrapper from './App';
 
 const rootElement = document.getElementById('root');
 if (!rootElement) {
@@ -14,6 +11,6 @@ if (!rootElement) {
 const root = ReactDOM.createRoot(rootElement);
 root.render(
   <React.StrictMode>
-    <App />
+    <AppWrapper />
   </React.StrictMode>
 );

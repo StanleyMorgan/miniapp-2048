@@ -1,16 +1,14 @@
+
 import React from 'react';
 import { useAccount } from 'wagmi';
-import { onChainSeasonConfigs } from '../constants/contract';
-import { Season } from './SeasonSelector';
-import type { LeaderboardEntry } from '../types';
-import { useLeaderboard, isOnChainSeason } from '../hooks/useLeaderboard';
+import type { LeaderboardEntry, SeasonInfo } from '../types';
+import { useLeaderboard } from '../hooks/useLeaderboard';
 
 interface LeaderboardProps {
   isReady: boolean;
-  activeSeason: Season;
+  activeSeasonId: string | null;
 }
 
-// A reusable component to render the list of players
 const LeaderboardList: React.FC<{ data: LeaderboardEntry[] }> = ({ data }) => {
   const currentUserEntry = data.find(entry => entry.isCurrentUser);
   const otherEntries = data
@@ -41,7 +39,6 @@ const LeaderboardList: React.FC<{ data: LeaderboardEntry[] }> = ({ data }) => {
   );
 };
 
-// A reusable skeleton loader
 const SkeletonLoader: React.FC = () => (
   <div className="flex flex-col gap-2 animate-pulse" role="status">
     {Array.from({ length: 15 }).map((_, i) => (
@@ -51,29 +48,18 @@ const SkeletonLoader: React.FC = () => (
 );
 
 
-const Leaderboard: React.FC<LeaderboardProps> = ({ isReady, activeSeason }) => {
-  const { data, isLoading, error } = useLeaderboard(isReady, activeSeason);
-
-  // --- WAGMI Hooks for On-Chain UX (network checks) ---
-  const { isConnected, chainId } = useAccount();
-  const activeSeasonConfig = isOnChainSeason(activeSeason) ? onChainSeasonConfigs[activeSeason] : null;
-
+const Leaderboard: React.FC<LeaderboardProps> = ({ isReady, activeSeasonId }) => {
+  const { data, isLoading, error } = useLeaderboard(isReady, activeSeasonId);
+  const { isConnected } = useAccount();
+  
   const renderContent = () => {
-    // --- UX for On-Chain Seasons ---
-    if (activeSeasonConfig) {
+    // A simple check for on-chain seasons based on ID
+    if (activeSeasonId && activeSeasonId !== 'farcaster') {
       if (!isConnected) {
         return <div className="text-center text-slate-400 p-8">Connect your wallet to see your rank.</div>;
       }
-      if (chainId !== activeSeasonConfig.chainId) {
-        return (
-          <div className="text-center text-yellow-300 p-8" role="alert">
-            Please switch to the {activeSeasonConfig.chainName} network.
-          </div>
-        );
-      }
     }
     
-    // --- General Data Display Logic ---
     if (isLoading) {
       return <SkeletonLoader />;
     }

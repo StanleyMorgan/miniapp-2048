@@ -1,20 +1,10 @@
-// --- MONAD S0 CONTRACT DETAILS ---
-// The contract address is now loaded from a Vite environment variable.
-// Create a .env.local file in your project root and add:
-// VITE_MONAD_CONTRACT_ADDRESS=0xYourContractAddressHere
-export const MONAD_LEADERBOARD_ADDRESS = ((import.meta as any).env?.VITE_MONAD_CONTRACT_ADDRESS || process.env.VITE_MONAD_CONTRACT_ADDRESS) as `0x${string}`;
 
-// --- BASE S0 CONTRACT DETAILS ---
-// VITE_BASE_CONTRACT_ADDRESS=0x3a51F8B9d3489d0A6eDccf88565bFC9594129fd7
-export const BASE_LEADERBOARD_ADDRESS = ((import.meta as any).env?.VITE_BASE_CONTRACT_ADDRESS || process.env.VITE_BASE_CONTRACT_ADDRESS) as `0x${string}`;
-
-// --- CELO S0 CONTRACT DETAILS ---
-// VITE_CELO_CONTRACT_ADDRESS=0x7aD03C587f63165d4119D912D112E3a060694f78
-export const CELO_LEADERBOARD_ADDRESS = ((import.meta as any).env?.VITE_CELO_CONTRACT_ADDRESS || process.env.VITE_CELO_CONTRACT_ADDRESS) as `0x${string}`;
+// All season-specific configurations, including contract addresses and chain IDs,
+// have been migrated to the `seasons` table in the database.
+// This file now only contains the shared ABI for on-chain leaderboard contracts.
 
 // --- SHARED LEADERBOARD ABI ---
-// This ABI is assumed to be the same for Monad, Base, and Celo leaderboards.
-// FIX: Add `as const` to strongly type the ABI for better type inference with viem/wagmi.
+// This ABI is assumed to be the same for all on-chain leaderboards.
 export const LEADERBOARD_ABI = [
   {"anonymous":false,"inputs":[{"indexed":true,"internalType":"address","name":"player","type":"address"},{"indexed":false,"internalType":"uint64","name":"score","type":"uint64"}],"name":"GameSubmitted","type":"event"},
   {"inputs":[],"name":"getLeaderboard","outputs":[{"components":[{"internalType":"address","name":"player","type":"address"},{"internalType":"uint64","name":"score","type":"uint64"}],"internalType":"struct GameLeaderboard.Leader[]","name":"","type":"tuple[]"}],"stateMutability":"view","type":"function"},
@@ -22,38 +12,3 @@ export const LEADERBOARD_ABI = [
   {"inputs":[{"internalType":"address","name":"","type":"address"}],"name":"results","outputs":[{"internalType":"uint128","name":"packedBoard","type":"uint128"},{"internalType":"uint64","name":"score","type":"uint64"},{"internalType":"uint64","name":"startTime","type":"uint64"},{"internalType":"uint64","name":"endTime","type":"uint64"},{"internalType":"bytes32","name":"seed","type":"bytes32"},{"internalType":"bytes32","name":"randomness","type":"bytes32"},{"internalType":"bytes32","name":"movesHash","type":"bytes32"}],"stateMutability":"view","type":"function"},
   {"inputs":[{"internalType":"uint128","name":"packedBoard","type":"uint128"},{"internalType":"uint64","name":"score","type":"uint64"},{"internalType":"uint64","name":"startTime","type":"uint64"},{"internalType":"uint64","name":"endTime","type":"uint64"},{"internalType":"bytes32","name":"seed","type":"bytes32"},{"internalType":"bytes32","name":"randomness","type":"bytes32"},{"internalType":"bytes32","name":"movesHash","type":"bytes32"}],"name":"submitGame","outputs":[],"stateMutability":"nonpayable","type":"function"}
 ] as const;
-
-// Helper type for on-chain season configuration
-// FIX: Use the strongly-typed ABI to fix type errors in contract calls.
-export type OnChainSeasonConfig = {
-  address: `0x${string}`;
-  abi: typeof LEADERBOARD_ABI;
-  chainId: number;
-  chainName: string;
-};
-
-// Map seasons to their on-chain configurations
-export const onChainSeasonConfigs = {
-  'monad-s0': {
-    address: MONAD_LEADERBOARD_ADDRESS,
-    abi: LEADERBOARD_ABI,
-    chainId: 10143,
-    chainName: 'Monad Testnet',
-  },
-  'base-s0': {
-    address: BASE_LEADERBOARD_ADDRESS,
-    abi: LEADERBOARD_ABI,
-    chainId: 8453,
-    chainName: 'Base',
-  },
-  'celo-s0': {
-    address: CELO_LEADERBOARD_ADDRESS,
-    abi: LEADERBOARD_ABI,
-    chainId: 42220,
-    chainName: 'Celo',
-  },
-};
-
-// For backward compatibility where MONAD_LEADERBOARD_ABI is imported directly.
-export const MONAD_LEADERBOARD_ABI = LEADERBOARD_ABI;
-// --- END OF CONTRACT DETAILS ---

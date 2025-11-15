@@ -1,32 +1,18 @@
+
 import React, { useState, useEffect, useRef } from 'react';
-
-export type Season = 'farcaster' | 'base-s0' | 'celo-s0' | 'monad-s0';
-
-export interface SeasonInfo {
-  id: Season;
-  name: string;
-  shareName?: string;
-  prize?: number;
-  prizeUnit?: string;
-}
-
-export const seasons: SeasonInfo[] = [
-  { id: 'farcaster', name: 'FARCASTER' },
-  { id: 'monad-s0', name: 'MONAD S0', shareName: 'Monad Season 0', prize: 10, prizeUnit: 'MON' },
-  { id: 'base-s0', name: 'BASE S0', shareName: 'Base Season 0', prize: 0.01, prizeUnit: 'ETH' },
-  { id: 'celo-s0', name: 'CELO S0', shareName: 'Celo Season 0', prize: 100, prizeUnit: 'CELO' },
-];
+import type { SeasonInfo } from '../types';
 
 interface SeasonSelectorProps {
-  activeSeason: Season;
-  onSeasonChange: (season: Season) => void;
+  seasons: SeasonInfo[];
+  activeSeasonId: string;
+  onSeasonChange: (seasonId: string) => void;
 }
 
-const SeasonSelector: React.FC<SeasonSelectorProps> = ({ activeSeason, onSeasonChange }) => {
+const SeasonSelector: React.FC<SeasonSelectorProps> = ({ seasons, activeSeasonId, onSeasonChange }) => {
   const [isOpen, setIsOpen] = useState(false);
   const wrapperRef = useRef<HTMLDivElement>(null);
 
-  const activeSeasonName = seasons.find(s => s.id === activeSeason)?.name || 'Select Season';
+  const activeSeasonName = seasons.find(s => s.id === activeSeasonId)?.name || 'Select Season';
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -40,7 +26,7 @@ const SeasonSelector: React.FC<SeasonSelectorProps> = ({ activeSeason, onSeasonC
     };
   }, []);
 
-  const handleOptionClick = (seasonId: Season) => {
+  const handleOptionClick = (seasonId: string) => {
     onSeasonChange(seasonId);
     setIsOpen(false);
   };
@@ -71,10 +57,10 @@ const SeasonSelector: React.FC<SeasonSelectorProps> = ({ activeSeason, onSeasonC
               key={season.id}
               onClick={() => handleOptionClick(season.id)}
               className={`w-full text-left p-3 uppercase font-bold text-slate-300 hover:bg-slate-600 hover:text-white transition-colors flex justify-between items-center
-                ${activeSeason === season.id ? 'bg-orange-500/20 text-orange-400' : ''}`
+                ${activeSeasonId === season.id ? 'bg-orange-500/20 text-orange-400' : ''}`
               }
               role="option"
-              aria-selected={activeSeason === season.id}
+              aria-selected={activeSeasonId === season.id}
             >
               <span>{season.name}</span>
             </button>

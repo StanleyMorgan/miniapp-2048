@@ -1,5 +1,6 @@
+
 import React from 'react';
-import { Season, seasons } from './SeasonSelector';
+import type { SeasonInfo } from '../types';
 
 interface GameOverProps {
   score: number;
@@ -9,17 +10,16 @@ interface GameOverProps {
   isNewBestScore: boolean;
   userRank: number | null;
   submissionStatus: string;
-  activeSeason: Season;
+  activeSeason: SeasonInfo;
 }
 
 const GameOver: React.FC<GameOverProps> = ({ score, onSubmitScore, isSubmitting, hasSubmittedScore, isNewBestScore, userRank, submissionStatus, activeSeason }) => {
   
   const handleShare = () => {
     let text: string;
-    const seasonInfo = seasons.find(s => s.id === activeSeason);
-    const seasonShareName = seasonInfo?.shareName || seasonInfo?.name;
+    const seasonShareName = activeSeason.shareName || activeSeason.name;
 
-    if (activeSeason !== 'farcaster' && seasonShareName) {
+    if (activeSeason.id !== 'farcaster' && seasonShareName) {
       // On-chain season message
       if (userRank) {
         text = `I just reached rank #${userRank} with a hashrate of ${score} in the 2048 Mining App during ${seasonShareName}! Can you beat it?`;
