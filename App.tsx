@@ -25,7 +25,6 @@ const App: React.FC = () => {
   const [isSdkReady, setIsSdkReady] = useState(false);
   const { isConnected, chain, status: wagmiStatus } = useAccount();
   const [isAppReady, setIsAppReady] = useState(false); // This will gate the whole app
-  const appReadyTimeoutRef = useRef<number | null>(null);
 
   const { switchChain, isPending: isSwitchingChain } = useSwitchChain();
 
@@ -62,38 +61,18 @@ const App: React.FC = () => {
     });
   }, []);
   
-  // Effect to determine when the entire app is ready to render, with a timeout and auto-reload for stuck states.
+  // Effect to determine when the entire app is ready to render.
+  // It waits for both the SDK to be ready and for wagmi to establish a stable connection status.
   useEffect(() => {
-    // Always clear the previous timeout when this effect re-runs
-    if (appReadyTimeoutRef.current) {
-      clearTimeout(appReadyTimeoutRef.current);
-      appReadyTimeoutRef.current = null;
-    }
-
     console.log(`[APP] Readiness check: isSdkReady=${isSdkReady}, wagmiStatus=${wagmiStatus}`);
 
-    if (isSdkReady) {
-      if (wagmiStatus === 'connected' || wagmiStatus === 'disconnected') {
-        // Ideal case: wagmi has a definitive status.
-        console.log(`[APP] App is ready. WAGMI status: ${wagmiStatus}`);
-        setIsAppReady(true);
-      } else if (wagmiStatus === 'connecting' || wagmiStatus === 'reconnecting') {
-        // Wagmi is trying to connect or reconnect. This can get stuck on cold starts.
-        // Set a 3-second timeout. If it's still in this state, reload the app.
-        console.log(`[APP] Wagmi is in '${wagmiStatus}' state. Setting a 3-second timeout to prevent getting stuck.`);
-        appReadyTimeoutRef.current = window.setTimeout(() => {
-          console.warn(`[APP] Timeout reached while in '${wagmiStatus}' state. Reloading the application to resolve the stuck state.`);
-          window.location.reload();
-        }, 3000); // 3-second timeout
-      }
+    // The app is considered ready only when the SDK is ready AND wagmi has a definitive status.
+    if (isSdkReady && (wagmiStatus === 'connected' || wagmiStatus === 'disconnected')) {
+      console.log(`[APP] App is ready. WAGMI status: ${wagmiStatus}`);
+      setIsAppReady(true);
     }
-    
-    // Cleanup function to clear timeout if the component unmounts
-    return () => {
-      if (appReadyTimeoutRef.current) {
-        clearTimeout(appReadyTimeoutRef.current);
-      }
-    };
+    // While wagmiStatus is 'connecting' or 'reconnecting', isAppReady remains false,
+    // and the loading screen will be displayed without reloading the page.
   }, [isSdkReady, wagmiStatus]);
 
 
@@ -163,9 +142,14 @@ const App: React.FC = () => {
 
   // Render a global initializing screen until the app is ready.
   if (!isAppReady) {
+    let loadingMessage = 'Initializing...';
+    if (isSdkReady && (wagmiStatus === 'connecting' || wagmiStatus === 'reconnecting')) {
+      loadingMessage = 'Connecting wallet...';
+    }
+    
     return (
       <div className="min-h-screen w-screen flex flex-col items-center justify-center">
-        <div className="animate-pulse text-slate-400">Initializing...</div>
+        <div className="animate-pulse text-slate-400">{loadingMessage}</div>
       </div>
     );
   }

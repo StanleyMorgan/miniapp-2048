@@ -1,7 +1,7 @@
 {
   "name": "2048-miningapp",
   "private": true,
-  "version": "0.0.006",
+  "version": "0.0.007",
   "type": "module",
   "scripts": {
     "dev": "vite",
