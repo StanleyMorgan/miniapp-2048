@@ -13,7 +13,7 @@ import { useAccount, useSwitchChain, useConnect, WagmiProvider } from 'wagmi';
 import { config } from './wagmiConfig';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { useLeaderboard } from './hooks/useLeaderboard';
-import { celoS0RewardShares } from './constants/rewards';
+import { TOP_100_REWARD_SHARES } from './constants/rewards';
 import InfoDisplay from './components/InfoDisplay';
 import CountdownTimer from './components/CountdownTimer';
 import type { SeasonInfo } from './types';
@@ -143,31 +143,46 @@ const Game: React.FC<{ seasons: SeasonInfo[], activeSeason: SeasonInfo | undefin
   }
 
   const calculateYourRewards = () => {
-    if (!activeSeason || !leaderboardData || isLeaderboardLoading) return '****';
-
-    if (activeSeason.id === 'farcaster') return '****';
-
-    if (!['celo-s0', 'monad-s0', 'base-s0'].includes(activeSeason.id) || !activeSeason.prizePool) return null;
+    // A season must be on-chain (have a contract address) and have a prize pool to have rewards.
+    if (!activeSeason || !leaderboardData || isLeaderboardLoading || !activeSeason.prizePool || !activeSeason.contractAddress) {
+      return '****';
+    }
 
     const currentUserEntry = leaderboardData.find(entry => entry.isCurrentUser);
-    if (!currentUserEntry || !currentUserEntry.rank) return null;
+    if (!currentUserEntry || !currentUserEntry.rank) {
+      return null; // User not on leaderboard or rank is 0
+    }
 
     const rank = currentUserEntry.rank;
     const totalPlayers = leaderboardData.length;
     let effectiveRank = rank;
 
+    // This logic ensures that if there are fewer than 100 players, the rewards are still
+    // distributed from the "end" of the reward share table.
+    // E.g., if 10 players, 1st place gets the reward for rank 91, 2nd for 92, etc.
     if (totalPlayers > 0 && totalPlayers < 100) {
       effectiveRank = 100 - totalPlayers + rank;
     }
 
-    if (activeSeason.id === 'celo-s0' && effectiveRank > 0 && effectiveRank <= celoS0RewardShares.length) {
-      const share = celoS0RewardShares[effectiveRank - 1];
+    if (effectiveRank > 0 && effectiveRank <= TOP_100_REWARD_SHARES.length) {
+      const share = TOP_100_REWARD_SHARES[effectiveRank - 1];
       const reward = activeSeason.prizePool * share;
-      const formattedReward = reward.toFixed(reward % 1 === 0 ? 0 : 5);
+      
+      // Smart formatting for decimals
+      let decimalPlaces;
+      if (reward >= 1) {
+          decimalPlaces = 2;
+      } else if (reward > 0.001) {
+          decimalPlaces = 4;
+      } else {
+          decimalPlaces = 6;
+      }
+      const formattedReward = parseFloat(reward.toFixed(decimalPlaces));
+
       return <><span className="text-orange-400">{formattedReward}</span><span className="text-white ml-1">{activeSeason.prizeUnit}</span></>;
     }
-    
-    // Placeholder for other seasons' reward logic
+
+    // Fallback for ranks outside the reward zone (e.g., rank > 100)
     return null;
   };
 

@@ -1,4 +1,9 @@
-export const celoS0RewardShares: number[] = [
+/**
+ * Defines the percentage share of the total prize pool for each rank from 1 to 100.
+ * This distribution is used for all on-chain seasons to calculate individual rewards.
+ * The values are structured such that higher ranks (lower numbers) receive a larger share.
+ */
+export const TOP_100_REWARD_SHARES: number[] = [
     0.083473231313258700,
     0.068448049676872100,
     0.056127400735035100,

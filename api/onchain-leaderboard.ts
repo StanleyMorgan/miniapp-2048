@@ -1,4 +1,5 @@
 
+
 import { createPublicClient, http, defineChain, type Chain } from 'viem';
 import { LEADERBOARD_ABI } from '../constants/contract.js';
 import { createClient, Errors } from '@farcaster/quick-auth';
@@ -123,9 +124,8 @@ export async function GET(request: Request) {
     console.log('[onchain-leaderboard] Public VIEM client created.');
     console.log('[onchain-leaderboard] Attempting to read contract...');
 
-    // FIX: The `as const` on the parameter object was causing a type mismatch with viem's
-    // ReadContractParameters type, which does not expect readonly properties. Removing
-    // it allows TypeScript to correctly infer the parameters for a read operation.
+    // FIX: Explicitly pass an empty `args` array for contract functions that don't take arguments.
+    // This resolves a type inference issue with some versions of viem.
     const leaderboardData = await client.readContract({
         address: seasonConfig.contractAddress,
         abi: LEADERBOARD_ABI,
