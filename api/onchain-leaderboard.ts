@@ -1,6 +1,8 @@
 
 
 
+
+
 import { createPublicClient, http, defineChain, type Chain } from 'viem';
 import { LEADERBOARD_ABI } from '../constants/contract.js';
 import { createClient, Errors } from '@farcaster/quick-auth';
@@ -125,12 +127,12 @@ export async function GET(request: Request) {
     console.log('[onchain-leaderboard] Public VIEM client created.');
     console.log('[onchain-leaderboard] Attempting to read contract...');
 
-    // FIX: Explicitly pass an empty `args` array to the 'readContract' call. This is required by viem for functions that don't take any arguments to ensure correct type inference and resolves the TypeScript error.
+    // Removed args: [] as it was causing type inference issues with authorizationList in newer viem versions.
+    // Also explicitly cast contractAddress to `0x${string}` to satisfy type requirements.
     const leaderboardData = await client.readContract({
-        address: seasonConfig.contractAddress,
+        address: seasonConfig.contractAddress as `0x${string}`,
         abi: LEADERBOARD_ABI,
         functionName: 'getLeaderboard',
-        args: [],
     });
 
     console.log(`[onchain-leaderboard] Successfully read from contract. Raw data length: ${leaderboardData.length}`);

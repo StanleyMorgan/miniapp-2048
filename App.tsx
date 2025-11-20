@@ -243,6 +243,18 @@ const App: React.FC = () => {
         console.log('[SDK] Authenticated fetch successful.');
         await sdk.actions.ready();
         console.log('[SDK] Farcaster SDK is ready.');
+        
+        // Attempt to add the mini app to the user's library
+        try {
+            await sdk.actions.addMiniApp();
+            console.log('[SDK] Prompted to add mini app');
+        } catch (error) {
+            // We silence the error because it might happen if:
+            // 1. The user rejects the prompt (RejectedByUser)
+            // 2. The app is already added
+            // 3. We are running in dev mode with an invalid manifest (InvalidDomainManifestJson)
+            console.warn('[SDK] Failed to add mini app (non-critical):', error);
+        }
 
         setInitializationState('seasons');
         console.log('[APP] Fetching seasons...');
