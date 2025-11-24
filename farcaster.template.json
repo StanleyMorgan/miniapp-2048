@@ -1,3 +1,4 @@
+
 {
   "accountAssociation": {
     "header": "eyJmaWQiOjQ5MTk2MSwidHlwZSI6ImN1c3RvZHkiLCJrZXkiOiIweDFDMUFjOWQ1NDk4NzgyRkZhODcwOTVCMWE0Mzg3RjE4NDZBZWREODYifQ",
@@ -11,20 +12,20 @@
     "version": "1",
     "name": "2048 Mining App",
     "homeUrl": "https://2048-base.vercel.app/",
-    "iconUrl": "https://2048-base.vercel.app/logo128.png",
-    "splashImageUrl": "https://2048-base.vercel.app/logo128.png",
+    "iconUrl": "https://raw.githubusercontent.com/StanleyMorgan/graphics/main/app/2048/logo128.png",
+    "splashImageUrl": "https://raw.githubusercontent.com/StanleyMorgan/graphics/main/app/2048/logo128.png",
     "splashBackgroundColor": "#1e293b",
     "subtitle": "A crypto-themed 2048 puzzle.",
     "description": "Merge blocks to confirm transactions, increase your hash rate, and compete on the on-chain leaderboards.",
     "screenshotUrls": [
-      "https://2048-base.vercel.app/embed.png"
+      "https://raw.githubusercontent.com/StanleyMorgan/graphics/main/app/2048/embed.png"
     ],
     "primaryCategory": "games",
     "tags": ["game", "2048", "base", "mining"],
-    "heroImageUrl": "https://2048-base.vercel.app/embed.png",
+    "heroImageUrl": "https://raw.githubusercontent.com/StanleyMorgan/graphics/main/app/2048/embed.png",
     "tagline": "Confirm blocks, earn rewards!",
     "ogTitle": "2048 Mining App on Base",
     "ogDescription": "Play the 2048 Mining App puzzle game directly on Farcaster.",
-    "ogImageUrl": "https://2048-base.vercel.app/embed.png"
+    "ogImageUrl": "https://raw.githubusercontent.com/StanleyMorgan/graphics/main/app/2048/embed.png"
   }
 }
