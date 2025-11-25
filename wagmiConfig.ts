@@ -29,6 +29,19 @@ const base = defineChain({
   },
 });
 
+const baseSepolia = defineChain({
+  id: 84532,
+  name: 'Base Sepolia',
+  nativeCurrency: { name: 'Ether', symbol: 'ETH', decimals: 18 },
+  rpcUrls: {
+    default: { http: ['https://sepolia.base.org'] },
+  },
+  blockExplorers: {
+    default: { name: 'Basescan', url: 'https://sepolia.basescan.org' },
+  },
+  testnet: true,
+});
+
 const celo = defineChain({
   id: 42220,
   name: 'Celo',
@@ -43,10 +56,11 @@ const celo = defineChain({
 // --- END OF CHAIN DEFINITIONS ---
 
 export const config = createConfig({
-  chains: [monad, base, celo],
+  chains: [monad, base, baseSepolia, celo],
   transports: {
     [monad.id]: http(),
     [base.id]: http(),
+    [baseSepolia.id]: http(),
     [celo.id]: http(),
   },
   connectors: [

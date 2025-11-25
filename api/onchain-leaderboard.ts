@@ -1,10 +1,6 @@
 
-
-
-
-
 import { createPublicClient, http, defineChain, type Chain } from 'viem';
-import { LEADERBOARD_ABI } from '../constants/contract.js';
+import { LEADERBOARD_ABI } from '../constants/contract';
 import { createClient, Errors } from '@farcaster/quick-auth';
 import type { SeasonInfo } from '../types';
 
@@ -28,6 +24,16 @@ const base = defineChain({
   },
 });
 
+const baseSepolia = defineChain({
+  id: 84532,
+  name: 'Base Sepolia',
+  nativeCurrency: { name: 'Ether', symbol: 'ETH', decimals: 18 },
+  rpcUrls: {
+    default: { http: ['https://sepolia.base.org'] },
+  },
+  testnet: true,
+});
+
 const celo = defineChain({
   id: 42220,
   name: 'Celo',
@@ -40,6 +46,7 @@ const celo = defineChain({
 const chains: { [key: number]: Chain } = {
   [monad.id]: monad,
   [base.id]: base,
+  [baseSepolia.id]: baseSepolia,
   [celo.id]: celo,
 };
 
@@ -127,12 +134,13 @@ export async function GET(request: Request) {
     console.log('[onchain-leaderboard] Public VIEM client created.');
     console.log('[onchain-leaderboard] Attempting to read contract...');
 
-    // Removed args: [] as it was causing type inference issues with authorizationList in newer viem versions.
-    // Also explicitly cast contractAddress to `0x${string}` to satisfy type requirements.
+    // Explicitly cast contractAddress to `0x${string}` to satisfy type requirements.
+    // Providing args: [] is required for functions with no inputs to satisfy strict type overloads in viem.
     const leaderboardData = await client.readContract({
         address: seasonConfig.contractAddress as `0x${string}`,
         abi: LEADERBOARD_ABI,
         functionName: 'getLeaderboard',
+        args: [],
     });
 
     console.log(`[onchain-leaderboard] Successfully read from contract. Raw data length: ${leaderboardData.length}`);
