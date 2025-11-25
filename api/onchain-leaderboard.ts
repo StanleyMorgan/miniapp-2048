@@ -134,13 +134,10 @@ export async function GET(request: Request) {
     console.log('[onchain-leaderboard] Public VIEM client created.');
     console.log('[onchain-leaderboard] Attempting to read contract...');
 
-    // Explicitly cast contractAddress to `0x${string}` to satisfy type requirements.
-    // Providing args: [] is required for functions with no inputs to satisfy strict type overloads in viem.
     const leaderboardData = await client.readContract({
         address: seasonConfig.contractAddress as `0x${string}`,
         abi: LEADERBOARD_ABI,
         functionName: 'getLeaderboard',
-        args: [],
     });
 
     console.log(`[onchain-leaderboard] Successfully read from contract. Raw data length: ${leaderboardData.length}`);
