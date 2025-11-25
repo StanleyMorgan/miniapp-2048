@@ -1,4 +1,5 @@
 
+
 import { sql } from '@vercel/postgres';
 import type { SeasonInfo } from '../types';
 
@@ -33,6 +34,7 @@ export async function GET(request: Request) {
         is_enabled,
         is_default,
         contract_address,
+        contract_version,
         chain_id,
         chain_name,
         prize_pool,
@@ -55,6 +57,8 @@ export async function GET(request: Request) {
       // The `node-postgres` driver (used by @vercel/postgres) returns NUMERIC types as strings
       // to avoid precision loss. We need to parse it to a number for the frontend.
       prizePool: season.prizePool !== null ? parseFloat(season.prizePool) : null,
+      // Default to 'v1' if not specified in DB
+      contractVersion: season.contractVersion || 'v1',
     }));
 
 

@@ -26,6 +26,7 @@ export interface SeasonInfo {
   isEnabled: boolean;
   isDefault: boolean;
   contractAddress: `0x${string}` | null;
+  contractVersion: string | null; // e.g. 'v1', 'v2'
   chainId: number | null;
   chainName: string | null;
   prizePool: number | null;

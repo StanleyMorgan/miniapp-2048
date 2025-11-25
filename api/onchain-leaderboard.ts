@@ -1,6 +1,7 @@
 
-import { createPublicClient, http, defineChain, type Chain } from 'viem';
-import { LEADERBOARD_ABI } from '../constants/contract.js';
+
+import { createPublicClient, http, defineChain, type Chain, type Abi } from 'viem';
+import { getAbiForVersion } from '../constants/contract.js';
 import { createClient, Errors } from '@farcaster/quick-auth';
 import type { SeasonInfo } from '../types';
 
@@ -88,7 +89,7 @@ export async function GET(request: Request) {
       headers: { 'Content-Type': 'application/json' },
     });
   }
-  console.log('[onchain-leaderboard] Found season config:', { address: seasonConfig.contractAddress, chainId: seasonConfig.chainId });
+  console.log('[onchain-leaderboard] Found season config:', { address: seasonConfig.contractAddress, chainId: seasonConfig.chainId, version: seasonConfig.contractVersion });
 
   const quickAuthClient = createClient();
   const authorization = request.headers.get('Authorization');
@@ -131,14 +132,17 @@ export async function GET(request: Request) {
     console.log(`[onchain-leaderboard] Mapped to chain: ${chain.name}`);
 
     const client = createPublicClient({ chain: chain, transport: http() });
+    
+    const contractAbi = getAbiForVersion(seasonConfig.contractVersion);
+
     console.log('[onchain-leaderboard] Public VIEM client created.');
     console.log('[onchain-leaderboard] Attempting to read contract...');
 
     const leaderboardData = await client.readContract({
         address: seasonConfig.contractAddress as `0x${string}`,
-        abi: LEADERBOARD_ABI,
+        abi: contractAbi as Abi,
         functionName: 'getLeaderboard',
-    });
+    }) as any[]; // Type cast as any[] because different ABIs might return slightly different structures, though we assume compatible for now.
 
     console.log(`[onchain-leaderboard] Successfully read from contract. Raw data length: ${leaderboardData.length}`);
     console.log('[onchain-leaderboard] Enriching leaderboard data with Farcaster profiles via Neynar API...');

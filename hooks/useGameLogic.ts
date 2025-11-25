@@ -1,4 +1,5 @@
 
+
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { sdk } from '@farcaster/miniapp-sdk';
 import { useAccount, useConnect, useWriteContract, useWaitForTransactionReceipt, useReadContract, useSwitchChain } from 'wagmi';
@@ -13,7 +14,7 @@ import {
   sha256,
   hexToUint8Array,
 } from '../utils/gridUtils';
-import { LEADERBOARD_ABI } from '../constants/contract';
+import { getAbiForVersion } from '../constants/contract';
 
 const BEST_SCORE_KEY = 'bestScore2048';
 const ANIMATION_DURATION = 200;
@@ -62,6 +63,9 @@ export const useGameLogic = (isAppReady: boolean, activeSeason: SeasonInfo | und
   
   const isBestScoreQueryEnabled = isAppReady && !!userAddress && !!activeSeason?.contractAddress && isConnected && chain?.id === activeSeason.chainId;
 
+  // Select the correct ABI based on the season version
+  const contractAbi = getAbiForVersion(activeSeason?.contractVersion);
+
   useEffect(() => {
     if (activeSeason?.contractAddress) {
         console.log(`[DEBUG] Best Score Query State for season '${activeSeason.id}':`, {
@@ -72,13 +76,14 @@ export const useGameLogic = (isAppReady: boolean, activeSeason: SeasonInfo | und
             expectedChainId: activeSeason.chainId,
             isCorrectChain: chain?.id === activeSeason.chainId,
             isQueryEnabled: isBestScoreQueryEnabled,
+            contractVersion: activeSeason.contractVersion
         });
     }
   }, [isAppReady, userAddress, isConnected, chain?.id, activeSeason, isBestScoreQueryEnabled]);
   
   const { data: onChainResult, error: onChainResultError } = useReadContract({
     address: activeSeason?.contractAddress,
-    abi: LEADERBOARD_ABI,
+    abi: contractAbi,
     functionName: 'results',
     args: [userAddress as `0x${string}`],
     query: {
@@ -359,7 +364,7 @@ export const useGameLogic = (isAppReady: boolean, activeSeason: SeasonInfo | und
             finalMovesHash as `0x${string}`
         ] as const;
         
-        console.log(`[ONCHAIN] Preparing to submit score to ${activeSeason.contractAddress} on chain ${activeSeason.chainId}.`);
+        console.log(`[ONCHAIN] Preparing to submit score to ${activeSeason.contractAddress} on chain ${activeSeason.chainId} using version ${activeSeason.contractVersion}`);
         console.log('[ONCHAIN] Submission args:', {
             packedBoard: '0x' + BigInt(packedBoard).toString(16),
             score,
@@ -372,7 +377,7 @@ export const useGameLogic = (isAppReady: boolean, activeSeason: SeasonInfo | und
 
         writeContract({
           address: activeSeason.contractAddress,
-          abi: LEADERBOARD_ABI,
+          abi: contractAbi,
           functionName: 'submitGame',
           args: args,
           account: wagmiAddress,
@@ -418,7 +423,7 @@ export const useGameLogic = (isAppReady: boolean, activeSeason: SeasonInfo | und
     } finally {
       setIsSubmitting(false);
     }
-  }, [score, hasSubmittedScore, isSubmitting, activeSeason, tiles, seed, startTime, randomness, finalMovesHash, userAddress, isConnected, wagmiAddress, connect, connectors, writeContract, chain, switchChain]);
+  }, [score, hasSubmittedScore, isSubmitting, activeSeason, tiles, seed, startTime, randomness, finalMovesHash, userAddress, isConnected, wagmiAddress, connect, connectors, writeContract, chain, switchChain, contractAbi]);
 
   const performMove = useCallback(async (direction: 'up' | 'down' | 'left' | 'right') => {
     if (isGameOver || isMoving || !prng || !finalMovesHash) return;
