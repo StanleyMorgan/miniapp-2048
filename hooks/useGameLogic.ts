@@ -65,6 +65,17 @@ export const useGameLogic = (isAppReady: boolean, activeSeason: SeasonInfo | und
 
   // Select the correct ABI based on the season version
   const contractAbi = getAbiForVersion(activeSeason?.contractVersion);
+  const isV2 = activeSeason?.contractVersion === 'v2';
+
+  // For V2 contracts, fetch the required fee amount
+  const { data: feeAmount, isLoading: isFeeLoading } = useReadContract({
+    address: activeSeason?.contractAddress,
+    abi: contractAbi,
+    functionName: 'feeAmount',
+    query: {
+      enabled: isV2 && !!activeSeason?.contractAddress,
+    }
+  });
 
   useEffect(() => {
     if (activeSeason?.contractAddress) {
@@ -93,7 +104,7 @@ export const useGameLogic = (isAppReady: boolean, activeSeason: SeasonInfo | und
 
   useEffect(() => {
     if (onChainResult) {
-      const score = onChainResult?.[1];
+      const score = (onChainResult as any)?.[1]; // Use any cast to handle potential abi differences, though structure matches
       console.log(`[ONCHAIN] Successfully fetched best score for ${userAddress} on season ${activeSeason?.id}: ${score}`);
     }
     if (onChainResultError) {
@@ -103,7 +114,7 @@ export const useGameLogic = (isAppReady: boolean, activeSeason: SeasonInfo | und
 
   useEffect(() => {
     if (activeSeason?.contractAddress) {
-      const onChainScore = onChainResult?.[1];
+      const onChainScore = (onChainResult as any)?.[1];
       setServerBestScore(typeof onChainScore === 'bigint' ? Number(onChainScore) : 0);
     } else {
       setServerBestScore(farcasterBestScore);
@@ -322,6 +333,16 @@ export const useGameLogic = (isAppReady: boolean, activeSeason: SeasonInfo | und
           throw new Error("Missing critical game data for on-chain submission.");
         }
 
+        // Check if v2 fee is still loading
+        if (isV2 && isFeeLoading) {
+             setSubmissionStatus('Fetching fee data...');
+             // Wait briefly? Or just fail? Let's assume if user clicked, we can wait a moment or fail.
+             // Ideally we shouldn't enable the button if loading, but for now:
+             if (feeAmount === undefined) {
+                 throw new Error("Unable to determine transaction fee. Please try again.");
+             }
+        }
+
         if (!isConnected) {
           console.log('[ONCHAIN] Wallet not connected. Prompting user to connect.');
           setSubmissionStatus('Connecting wallet...');
@@ -354,6 +375,7 @@ export const useGameLogic = (isAppReady: boolean, activeSeason: SeasonInfo | und
 
         const packedBoard = packBoard(tiles);
         const endTime = Date.now();
+        
         const args = [
             BigInt(packedBoard),
             BigInt(score),
@@ -362,18 +384,23 @@ export const useGameLogic = (isAppReady: boolean, activeSeason: SeasonInfo | und
             ('0x' + seed) as `0x${string}`,
             ('0x' + randomness) as `0x${string}`,
             finalMovesHash as `0x${string}`
-        ] as const;
+        ] as any[];
+
+        let valueToSend: bigint | undefined = undefined;
+
+        if (isV2) {
+             // V2 requires referrer and potentially a fee
+             // We use 0x00...00 as referrer for now as we don't have a referral UI
+             args.push('0x0000000000000000000000000000000000000000');
+             
+             if (feeAmount) {
+                 valueToSend = feeAmount as bigint;
+                 console.log(`[ONCHAIN] V2 Contract detected. Attaching fee: ${valueToSend.toString()}`);
+             }
+        }
         
         console.log(`[ONCHAIN] Preparing to submit score to ${activeSeason.contractAddress} on chain ${activeSeason.chainId} using version ${activeSeason.contractVersion}`);
-        console.log('[ONCHAIN] Submission args:', {
-            packedBoard: '0x' + BigInt(packedBoard).toString(16),
-            score,
-            startTime,
-            endTime,
-            seed: '0x' + seed,
-            randomness: '0x' + randomness,
-            finalMovesHash
-        });
+        console.log('[ONCHAIN] Submission args:', args);
 
         writeContract({
           address: activeSeason.contractAddress,
@@ -382,6 +409,7 @@ export const useGameLogic = (isAppReady: boolean, activeSeason: SeasonInfo | und
           args: args,
           account: wagmiAddress,
           chain: chain,
+          value: valueToSend
         });
 
       } catch (error: any) {
@@ -423,7 +451,7 @@ export const useGameLogic = (isAppReady: boolean, activeSeason: SeasonInfo | und
     } finally {
       setIsSubmitting(false);
     }
-  }, [score, hasSubmittedScore, isSubmitting, activeSeason, tiles, seed, startTime, randomness, finalMovesHash, userAddress, isConnected, wagmiAddress, connect, connectors, writeContract, chain, switchChain, contractAbi]);
+  }, [score, hasSubmittedScore, isSubmitting, activeSeason, tiles, seed, startTime, randomness, finalMovesHash, userAddress, isConnected, wagmiAddress, connect, connectors, writeContract, chain, switchChain, contractAbi, isV2, feeAmount, isFeeLoading]);
 
   const performMove = useCallback(async (direction: 'up' | 'down' | 'left' | 'right') => {
     if (isGameOver || isMoving || !prng || !finalMovesHash) return;

@@ -1,5 +1,6 @@
 
 
+
 import { createPublicClient, http, defineChain, type Chain, type Abi } from 'viem';
 import { getAbiForVersion } from '../constants/contract.js';
 import { createClient, Errors } from '@farcaster/quick-auth';
@@ -140,9 +141,9 @@ export async function GET(request: Request) {
 
     const leaderboardData = await client.readContract({
         address: seasonConfig.contractAddress as `0x${string}`,
-        abi: contractAbi as Abi,
+        abi: contractAbi,
         functionName: 'getLeaderboard',
-    }) as any[]; // Type cast as any[] because different ABIs might return slightly different structures, though we assume compatible for now.
+    } as any) as any[]; // Type cast as any[] because different ABIs might return slightly different structures, though we assume compatible for now.
 
     console.log(`[onchain-leaderboard] Successfully read from contract. Raw data length: ${leaderboardData.length}`);
     console.log('[onchain-leaderboard] Enriching leaderboard data with Farcaster profiles via Neynar API...');
