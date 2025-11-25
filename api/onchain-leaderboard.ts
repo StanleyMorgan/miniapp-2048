@@ -1,6 +1,6 @@
 
 import { createPublicClient, http, defineChain, type Chain } from 'viem';
-import { LEADERBOARD_ABI } from '../constants/contract';
+import { LEADERBOARD_ABI } from '../constants/contract.js';
 import { createClient, Errors } from '@farcaster/quick-auth';
 import type { SeasonInfo } from '../types';
 
