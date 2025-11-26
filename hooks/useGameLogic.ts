@@ -322,6 +322,13 @@ export const useGameLogic = (isAppReady: boolean, activeSeason: SeasonInfo | und
 
   const submitScore = useCallback(async () => {
     if (hasSubmittedScore || isSubmitting || !activeSeason) return;
+    
+    // Safety check: Prevent submission if season has ended
+    if (activeSeason.endDate && new Date(activeSeason.endDate).getTime() < Date.now()) {
+      setSubmissionStatus('Season has ended');
+      return;
+    }
+
     setIsSubmitting(true);
     
     if (activeSeason.contractAddress) {

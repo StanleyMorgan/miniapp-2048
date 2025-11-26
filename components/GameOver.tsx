@@ -15,6 +15,8 @@ interface GameOverProps {
 
 const GameOver: React.FC<GameOverProps> = ({ score, onSubmitScore, isSubmitting, hasSubmittedScore, isNewBestScore, userRank, submissionStatus, activeSeason }) => {
   
+  const isSeasonEnded = activeSeason.endDate ? new Date(activeSeason.endDate).getTime() < Date.now() : false;
+
   const handleShare = () => {
     let text: string;
     const seasonShareName = activeSeason.shareName || activeSeason.name;
@@ -60,10 +62,13 @@ const GameOver: React.FC<GameOverProps> = ({ score, onSubmitScore, isSubmitting,
       <h2 className="text-5xl font-extrabold text-white mb-2 text-center">Overload!</h2>
       {isNewBestScore && <p className="text-xl text-orange-400 font-bold mb-1">New Peak Rate!</p>}
       <p className="text-lg text-slate-300 mb-6">Your Hashrate: {score}</p>
+      
+      {isSeasonEnded && <p className="text-sm text-red-400 font-bold mb-4 uppercase tracking-wide">Season Ended</p>}
+
       <div className="flex flex-col items-center gap-2">
         <div className="flex gap-4 items-start h-[66px]">
           {/* Show "Follow" instead of the old gray "Try Again" button */}
-          {(!isNewBestScore || hasSubmittedScore) && (
+          {(!isNewBestScore || hasSubmittedScore || isSeasonEnded) && (
             <div className="flex flex-col items-center">
               <a
                 href={followUrl}
@@ -90,13 +95,15 @@ const GameOver: React.FC<GameOverProps> = ({ score, onSubmitScore, isSubmitting,
                 <span className="text-xs text-slate-400 mt-1">boost your rewards</span>
               </div>
             ) : (
-              <button
-                onClick={onSubmitScore}
-                disabled={isSubmitting}
-                className="bg-orange-500 hover:bg-orange-600 text-white font-bold py-3 px-5 rounded-lg transition-colors duration-200 text-base whitespace-nowrap disabled:bg-orange-700 disabled:cursor-not-allowed self-center"
-              >
-                {getButtonText()}
-              </button>
+              !isSeasonEnded && (
+                <button
+                  onClick={onSubmitScore}
+                  disabled={isSubmitting}
+                  className="bg-orange-500 hover:bg-orange-600 text-white font-bold py-3 px-5 rounded-lg transition-colors duration-200 text-base whitespace-nowrap disabled:bg-orange-700 disabled:cursor-not-allowed self-center"
+                >
+                  {getButtonText()}
+                </button>
+              )
             )
           )}
         </div>
