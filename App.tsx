@@ -1,5 +1,4 @@
 
-
 import React, { useEffect, useState, useCallback } from 'react';
 import { sdk } from '@farcaster/miniapp-sdk';
 import { useGameLogic } from './hooks/useGameLogic';
@@ -49,7 +48,8 @@ const Game: React.FC<{
     wasNewBestScore,
     userRank,
     isInitializing,
-    submissionStatus
+    submissionStatus,
+    userAddress // Extracted userAddress
   } = useGameLogic(!!activeSeason, activeSeason, referrer);
   
   const { data: leaderboardData, isLoading: isLeaderboardLoading } = useLeaderboard(!!activeSeason, activeSeason?.id || null);
@@ -141,6 +141,7 @@ const Game: React.FC<{
               userRank={userRank}
               submissionStatus={submissionStatus}
               activeSeason={activeSeason}
+              currentUserAddress={userAddress}
             />
           )}
         </div>

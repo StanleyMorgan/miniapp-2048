@@ -11,9 +11,10 @@ interface GameOverProps {
   userRank: number | null;
   submissionStatus: string;
   activeSeason: SeasonInfo;
+  currentUserAddress: string | null;
 }
 
-const GameOver: React.FC<GameOverProps> = ({ score, onSubmitScore, isSubmitting, hasSubmittedScore, isNewBestScore, userRank, submissionStatus, activeSeason }) => {
+const GameOver: React.FC<GameOverProps> = ({ score, onSubmitScore, isSubmitting, hasSubmittedScore, isNewBestScore, userRank, submissionStatus, activeSeason, currentUserAddress }) => {
   
   const isSeasonEnded = activeSeason.endDate ? new Date(activeSeason.endDate).getTime() < Date.now() : false;
 
@@ -38,7 +39,20 @@ const GameOver: React.FC<GameOverProps> = ({ score, onSubmitScore, isSubmitting,
     }
 
     const encodedText = encodeURIComponent(text);
-    const appUrl = 'https://2048-base.vercel.app/'; // URL of your mini app
+    
+    // Construct the URL with query parameters
+    const baseUrl = 'https://2048-base.vercel.app/';
+    const params = new URLSearchParams();
+    
+    // Always append the current season
+    params.append('season', activeSeason.id);
+    
+    // If we have the current user's address, append it as the referrer
+    if (currentUserAddress) {
+        params.append('ref', currentUserAddress);
+    }
+    
+    const appUrl = `${baseUrl}?${params.toString()}`;
     const encodedAppUrl = encodeURIComponent(appUrl);
     
     // Using warpcast.com is generally recommended for composing casts
