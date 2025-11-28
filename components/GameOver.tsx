@@ -40,8 +40,10 @@ const GameOver: React.FC<GameOverProps> = ({ score, onSubmitScore, isSubmitting,
 
     const encodedText = encodeURIComponent(text);
     
-    // Construct the URL with query parameters
-    const baseUrl = 'https://2048-base.vercel.app/';
+    // Construct the URL with query parameters using the Farcaster Mini App Universal Link
+    // App ID: cWgc-9iS0tMl
+    // App Slug: 2048-mining-app
+    const baseUrl = 'https://farcaster.xyz/miniapps/cWgc-9iS0tMl/2048-mining-app';
     const params = new URLSearchParams();
     
     // Always append the current season
