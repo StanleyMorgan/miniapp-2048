@@ -1,6 +1,5 @@
 
 import React from 'react';
-import { sdk } from '@farcaster/miniapp-sdk';
 import type { SeasonInfo } from '../types';
 
 interface GameOverProps {
@@ -19,7 +18,7 @@ const GameOver: React.FC<GameOverProps> = ({ score, onSubmitScore, isSubmitting,
   
   const isSeasonEnded = activeSeason.endDate ? new Date(activeSeason.endDate).getTime() < Date.now() : false;
 
-  const handleShare = async () => {
+  const handleShare = () => {
     let text: string;
     const seasonShareName = activeSeason.shareName || activeSeason.name;
 
@@ -39,10 +38,10 @@ const GameOver: React.FC<GameOverProps> = ({ score, onSubmitScore, isSubmitting,
       }
     }
 
-    // Construct the URL with query parameters using the Farcaster Mini App Universal Link
-    // App ID: cWgc-9iS0tMl
-    // App Slug: 2048-mining-app
-    const baseUrl = 'https://farcaster.xyz/miniapps/cWgc-9iS0tMl/2048-mining-app';
+    const encodedText = encodeURIComponent(text);
+    
+    // Construct the URL with query parameters
+    const baseUrl = 'https://2048-base.vercel.app/';
     const params = new URLSearchParams();
     
     // Always append the current season
@@ -54,22 +53,12 @@ const GameOver: React.FC<GameOverProps> = ({ score, onSubmitScore, isSubmitting,
     }
     
     const appUrl = `${baseUrl}?${params.toString()}`;
-
-    try {
-      await sdk.actions.composeCast({
-        text: text,
-        embeds: [appUrl],
-      });
-    } catch (error) {
-      console.error('Failed to open cast composer via SDK, falling back to URL scheme:', error);
-      
-      const encodedText = encodeURIComponent(text);
-      const encodedAppUrl = encodeURIComponent(appUrl);
-      
-      // Using warpcast.com is generally recommended for composing casts as a fallback
-      const shareUrl = `https://warpcast.com/~/compose?text=${encodedText}&embeds[]=${encodedAppUrl}`;
-      window.open(shareUrl, '_blank');
-    }
+    const encodedAppUrl = encodeURIComponent(appUrl);
+    
+    // Using warpcast.com is generally recommended for composing casts
+    const shareUrl = `https://warpcast.com/~/compose?text=${encodedText}&embeds[]=${encodedAppUrl}`;
+    
+    window.open(shareUrl, '_blank');
   };
 
   const getButtonText = () => {
