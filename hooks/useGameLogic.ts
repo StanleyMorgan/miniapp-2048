@@ -15,12 +15,13 @@ import {
   hexToUint8Array,
 } from '../utils/gridUtils';
 import { getAbiForVersion } from '../constants/contract';
+import { isAddress } from 'viem';
 
 const BEST_SCORE_KEY = 'bestScore2048';
 const ANIMATION_DURATION = 200;
 const INITIAL_MOVES_HASH = '0x' + '0'.repeat(64);
 
-export const useGameLogic = (isAppReady: boolean, activeSeason: SeasonInfo | undefined) => {
+export const useGameLogic = (isAppReady: boolean, activeSeason: SeasonInfo | undefined, referrer: string | null) => {
   const [isInitializing, setIsInitializing] = useState(true);
   const [userAddress, setUserAddress] = useState<string | null>(null);
   const [tiles, setTiles] = useState<TileData[]>([]);
@@ -397,8 +398,14 @@ export const useGameLogic = (isAppReady: boolean, activeSeason: SeasonInfo | und
 
         if (isV2) {
              // V2 requires referrer and potentially a fee
-             // We use 0x00...00 as referrer for now as we don't have a referral UI
-             args.push('0x0000000000000000000000000000000000000000');
+             // Use the parsed referrer if valid, otherwise 0 address
+             let finalReferrer = '0x0000000000000000000000000000000000000000';
+             if (referrer && isAddress(referrer)) {
+                 finalReferrer = referrer;
+                 console.log(`[ONCHAIN] Applying referrer from URL: ${finalReferrer}`);
+             }
+
+             args.push(finalReferrer);
              
              if (feeAmount) {
                  valueToSend = feeAmount as bigint;
@@ -458,7 +465,7 @@ export const useGameLogic = (isAppReady: boolean, activeSeason: SeasonInfo | und
     } finally {
       setIsSubmitting(false);
     }
-  }, [score, hasSubmittedScore, isSubmitting, activeSeason, tiles, seed, startTime, randomness, finalMovesHash, userAddress, isConnected, wagmiAddress, connect, connectors, writeContract, chain, switchChain, contractAbi, isV2, feeAmount, isFeeLoading]);
+  }, [score, hasSubmittedScore, isSubmitting, activeSeason, tiles, seed, startTime, randomness, finalMovesHash, userAddress, isConnected, wagmiAddress, connect, connectors, writeContract, chain, switchChain, contractAbi, isV2, feeAmount, isFeeLoading, referrer]);
 
   const performMove = useCallback(async (direction: 'up' | 'down' | 'left' | 'right') => {
     if (isGameOver || isMoving || !prng || !finalMovesHash) return;

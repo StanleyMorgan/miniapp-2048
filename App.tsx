@@ -21,7 +21,12 @@ import type { SeasonInfo } from './types';
 
 const queryClient = new QueryClient();
 
-const Game: React.FC<{ seasons: SeasonInfo[], activeSeason: SeasonInfo | undefined, onSeasonChange: (id: string) => void }> = ({ seasons, activeSeason, onSeasonChange }) => {
+const Game: React.FC<{ 
+  seasons: SeasonInfo[], 
+  activeSeason: SeasonInfo | undefined, 
+  onSeasonChange: (id: string) => void,
+  referrer: string | null 
+}> = ({ seasons, activeSeason, onSeasonChange, referrer }) => {
   const [touchStart, setTouchStart] = useState<{x: number, y: number} | null>(null);
   const [activeTab, setActiveTab] = useState<'mining' | 'stats'>('mining');
   
@@ -45,7 +50,7 @@ const Game: React.FC<{ seasons: SeasonInfo[], activeSeason: SeasonInfo | undefin
     userRank,
     isInitializing,
     submissionStatus
-  } = useGameLogic(!!activeSeason, activeSeason);
+  } = useGameLogic(!!activeSeason, activeSeason, referrer);
   
   const { data: leaderboardData, isLoading: isLeaderboardLoading } = useLeaderboard(!!activeSeason, activeSeason?.id || null);
 
@@ -230,6 +235,7 @@ const App: React.FC = () => {
   const [initializationState, setInitializationState] = useState<'sdk' | 'seasons' | 'ready'>('sdk');
   const [seasons, setSeasons] = useState<SeasonInfo[]>([]);
   const [activeSeasonId, setActiveSeasonId] = useState<string | null>(null);
+  const [referrer, setReferrer] = useState<string | null>(null);
   
   const { status: wagmiStatus } = useAccount();
   const { connect, connectors } = useConnect();
@@ -265,8 +271,28 @@ const App: React.FC = () => {
         const defaultSeason = seasonsData.find(s => s.isDefault) || seasonsData[0];
         if (!defaultSeason) throw new Error('No seasons available');
 
+        // Parse URL Parameters (season and ref)
+        const params = new URLSearchParams(window.location.search);
+        const seasonParam = params.get('season');
+        const refParam = params.get('ref');
+
+        // Check if the requested season exists
+        let initialSeasonId = defaultSeason.id;
+        if (seasonParam) {
+           const requestedSeason = seasonsData.find(s => s.id === seasonParam);
+           if (requestedSeason && requestedSeason.isEnabled) {
+               initialSeasonId = requestedSeason.id;
+               console.log(`[APP] Deep linked to season: ${initialSeasonId}`);
+           }
+        }
+        
+        if (refParam) {
+            console.log(`[APP] Referrer detected: ${refParam}`);
+            setReferrer(refParam);
+        }
+
         setSeasons(seasonsData);
-        setActiveSeasonId(defaultSeason.id);
+        setActiveSeasonId(initialSeasonId);
         setInitializationState('ready');
         console.log('[APP] Seasons loaded, app is ready.');
 
@@ -299,7 +325,12 @@ const App: React.FC = () => {
   const activeSeason = seasons.find(s => s.id === activeSeasonId);
 
   return (
-    <Game seasons={seasons} activeSeason={activeSeason} onSeasonChange={setActiveSeasonId} />
+    <Game 
+      seasons={seasons} 
+      activeSeason={activeSeason} 
+      onSeasonChange={setActiveSeasonId}
+      referrer={referrer}
+    />
   );
 };
 
