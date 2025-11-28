@@ -1,5 +1,6 @@
 
 import React from 'react';
+import { sdk } from '@farcaster/miniapp-sdk';
 import type { SeasonInfo } from '../types';
 
 interface GameOverProps {
@@ -18,7 +19,7 @@ const GameOver: React.FC<GameOverProps> = ({ score, onSubmitScore, isSubmitting,
   
   const isSeasonEnded = activeSeason.endDate ? new Date(activeSeason.endDate).getTime() < Date.now() : false;
 
-  const handleShare = () => {
+  const handleShare = async () => {
     let text: string;
     const seasonShareName = activeSeason.shareName || activeSeason.name;
 
@@ -38,8 +39,6 @@ const GameOver: React.FC<GameOverProps> = ({ score, onSubmitScore, isSubmitting,
       }
     }
 
-    const encodedText = encodeURIComponent(text);
-    
     // Construct the URL with query parameters using the Farcaster Mini App Universal Link
     // App ID: cWgc-9iS0tMl
     // App Slug: 2048-mining-app
@@ -55,12 +54,22 @@ const GameOver: React.FC<GameOverProps> = ({ score, onSubmitScore, isSubmitting,
     }
     
     const appUrl = `${baseUrl}?${params.toString()}`;
-    const encodedAppUrl = encodeURIComponent(appUrl);
-    
-    // Using warpcast.com is generally recommended for composing casts
-    const shareUrl = `https://warpcast.com/~/compose?text=${encodedText}&embeds[]=${encodedAppUrl}`;
-    
-    window.open(shareUrl, '_blank');
+
+    try {
+      await sdk.actions.composeCast({
+        text: text,
+        embeds: [appUrl],
+      });
+    } catch (error) {
+      console.error('Failed to open cast composer via SDK, falling back to URL scheme:', error);
+      
+      const encodedText = encodeURIComponent(text);
+      const encodedAppUrl = encodeURIComponent(appUrl);
+      
+      // Using warpcast.com is generally recommended for composing casts as a fallback
+      const shareUrl = `https://warpcast.com/~/compose?text=${encodedText}&embeds[]=${encodedAppUrl}`;
+      window.open(shareUrl, '_blank');
+    }
   };
 
   const getButtonText = () => {
