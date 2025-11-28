@@ -40,9 +40,9 @@ const GameOver: React.FC<GameOverProps> = ({ score, onSubmitScore, isSubmitting,
 
     const encodedText = encodeURIComponent(text);
     
-    // Use the direct app URL for the embed to ensure parameters are passed to our Middleware correctly.
-    // The farcaster.xyz wrapper often strips parameters when generating the frame/button action.
-    const baseUrl = 'https://2048-base.vercel.app/';
+    // Construct the URL with query parameters
+    //const baseUrl = 'https://2048-base.vercel.app/';
+    const baseUrl = 'https://farcaster.xyz/miniapps/cWgc-9iS0tMl/2048-mining-app';
     const params = new URLSearchParams();
     
     // Always append the current season
