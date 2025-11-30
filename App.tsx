@@ -164,10 +164,14 @@ const Game: React.FC<{
 
         if (rank > 0 && rank <= FARCASTER_REWARD_MULTIPLIERS.length) {
             multiplier = FARCASTER_REWARD_MULTIPLIERS[rank - 1];
-            return <><span className="text-orange-400">X{multiplier.toFixed(2)}</span></>;
-        } else {
-            return <><span className="text-orange-400">X1.00</span></>;
         }
+
+        return (
+            <>
+                <span className="text-orange-400">{multiplier.toFixed(2)}</span>
+                <span className="text-white ml-1">X</span>
+            </>
+        );
     }
 
     // A season must be on-chain (have a contract address) and have a prize pool to have rewards.
