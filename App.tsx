@@ -13,7 +13,7 @@ import { useAccount, useSwitchChain, useConnect, WagmiProvider } from 'wagmi';
 import { config } from './wagmiConfig';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { useLeaderboard } from './hooks/useLeaderboard';
-import { TOP_100_REWARD_SHARES } from './constants/rewards';
+import { TOP_100_REWARD_SHARES, FARCASTER_REWARD_MULTIPLIERS } from './constants/rewards';
 import InfoDisplay from './components/InfoDisplay';
 import CountdownTimer from './components/CountdownTimer';
 import type { SeasonInfo } from './types';
@@ -150,8 +150,28 @@ const Game: React.FC<{
   }
 
   const calculateYourRewards = () => {
+    if (!activeSeason || !leaderboardData || isLeaderboardLoading) {
+        return '****';
+    }
+
+    // Special handling for Farcaster off-chain season to show multipliers
+    if (activeSeason.id === 'farcaster') {
+        const currentUserEntry = leaderboardData.find(entry => entry.isCurrentUser);
+        if (!currentUserEntry || !currentUserEntry.rank) return null;
+
+        const rank = currentUserEntry.rank;
+        let multiplier = 1.00;
+
+        if (rank > 0 && rank <= FARCASTER_REWARD_MULTIPLIERS.length) {
+            multiplier = FARCASTER_REWARD_MULTIPLIERS[rank - 1];
+            return <><span className="text-orange-400">X{multiplier.toFixed(2)}</span></>;
+        } else {
+            return <><span className="text-orange-400">X1.00</span></>;
+        }
+    }
+
     // A season must be on-chain (have a contract address) and have a prize pool to have rewards.
-    if (!activeSeason || !leaderboardData || isLeaderboardLoading || !activeSeason.prizePool || !activeSeason.contractAddress) {
+    if (!activeSeason.prizePool || !activeSeason.contractAddress) {
       return '****';
     }
 
