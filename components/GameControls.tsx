@@ -1,4 +1,6 @@
+
 import React from 'react';
+import { sdk } from '@farcaster/miniapp-sdk';
 
 interface GameControlsProps {
   score: number;
@@ -14,11 +16,22 @@ const ScoreBox: React.FC<{ title: string; score: number }> = ({ title, score }) 
 );
 
 const GameControls: React.FC<GameControlsProps> = ({ score, bestScore, onNewGame }) => {
+  
+  const handleClaim = async () => {
+    try {
+      await sdk.actions.openMiniApp({
+        url: 'https://farcaster.xyz/miniapps/_a3NifiAxJcF/moneygun'
+      });
+    } catch (error) {
+      console.error('Failed to open MoneyGun Mini App:', error);
+    }
+  };
+
   return (
     <div className="flex justify-end items-center w-full mb-4 px-1 gap-2">
       <button
-        disabled
-        className="bg-slate-500 text-slate-400 font-bold py-2 px-4 rounded-lg cursor-not-allowed h-12 flex items-center"
+        onClick={handleClaim}
+        className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-2 px-4 rounded-lg transition-colors duration-200 h-12 flex items-center shadow-lg hover:shadow-emerald-500/20"
       >
         Claim
       </button>
