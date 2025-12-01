@@ -311,9 +311,24 @@ const App: React.FC = () => {
            }
         }
         
+        // Referrer Logic: Persist in localStorage
+        const REFERRER_STORAGE_KEY = '2048_referrer';
+        let effectiveReferrer: string | null = null;
+
         if (refParam) {
-            console.log(`[APP] Referrer detected: ${refParam}`);
-            setReferrer(refParam);
+            console.log(`[APP] New referrer detected in URL: ${refParam}`);
+            localStorage.setItem(REFERRER_STORAGE_KEY, refParam);
+            effectiveReferrer = refParam;
+        } else {
+            const storedReferrer = localStorage.getItem(REFERRER_STORAGE_KEY);
+            if (storedReferrer) {
+                console.log(`[APP] Restored referrer from storage: ${storedReferrer}`);
+                effectiveReferrer = storedReferrer;
+            }
+        }
+        
+        if (effectiveReferrer) {
+            setReferrer(effectiveReferrer);
         }
 
         setSeasons(seasonsData);
