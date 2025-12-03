@@ -20,7 +20,7 @@
       "https://2048-base.vercel.app/embed.png"
     ],
     "primaryCategory": "games",
-    "tags": ["game", "2048", "base", "mining"],
+    "tags": ["game", "2048", "mining"],
     "heroImageUrl": "https://2048-base.vercel.app/embed.png",
     "tagline": "Confirm blocks, earn rewards!",
     "ogTitle": "2048 Mining App on Base",
