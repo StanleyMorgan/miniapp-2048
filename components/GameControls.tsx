@@ -16,8 +16,11 @@ const ScoreBox: React.FC<{ title: string; score: number }> = ({ title, score }) 
 );
 
 const GameControls: React.FC<GameControlsProps> = ({ score, bestScore, onNewGame }) => {
+  // SET THIS TO TRUE TO ENABLE THE CLAIM BUTTON
+  const IS_CLAIM_ENABLED = false;
   
   const handleClaim = async () => {
+    if (!IS_CLAIM_ENABLED) return;
     try {
       await sdk.actions.openMiniApp({
         url: 'https://farcaster.xyz/miniapps/_a3NifiAxJcF/moneygun'
@@ -31,8 +34,12 @@ const GameControls: React.FC<GameControlsProps> = ({ score, bestScore, onNewGame
     <div className="flex justify-end items-center w-full mb-4 px-1 gap-2">
       <button
         onClick={handleClaim}
-        disabled={true}
-        className="bg-orange-500 text-white font-bold py-2 px-4 rounded-lg h-12 flex items-center shadow-lg opacity-50 cursor-not-allowed"
+        disabled={!IS_CLAIM_ENABLED}
+        className={`font-bold py-2 px-4 rounded-lg h-12 flex items-center shadow-lg transition-colors duration-200 ${
+          IS_CLAIM_ENABLED 
+            ? 'bg-orange-500 hover:bg-orange-600 text-white' 
+            : 'bg-slate-500 text-slate-300 cursor-not-allowed'
+        }`}
       >
         Claim
       </button>
