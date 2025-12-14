@@ -55,7 +55,7 @@ export async function GET(request: Request) {
         primary_address,
         RANK() OVER (ORDER BY score DESC) as rank
       FROM scores 
-      LIMIT 20;
+      LIMIT 50;
     `;
 
     let leaderboard: LeaderboardEntry[] = topScoresRows.map(row => ({
