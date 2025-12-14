@@ -31,7 +31,8 @@ const GameControls: React.FC<GameControlsProps> = ({ score, bestScore, onNewGame
     <div className="flex justify-end items-center w-full mb-4 px-1 gap-2">
       <button
         onClick={handleClaim}
-        className="bg-orange-500 hover:bg-orange-600 text-white font-bold py-2 px-4 rounded-lg transition-colors duration-200 h-12 flex items-center shadow-lg hover:shadow-orange-500/20"
+        disabled={true}
+        className="bg-orange-500 text-white font-bold py-2 px-4 rounded-lg h-12 flex items-center shadow-lg opacity-50 cursor-not-allowed"
       >
         Claim
       </button>
