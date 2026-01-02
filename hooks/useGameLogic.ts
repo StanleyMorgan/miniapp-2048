@@ -1,5 +1,4 @@
 
-
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { sdk } from '@farcaster/miniapp-sdk';
 import { useAccount, useConnect, useWriteContract, useWaitForTransactionReceipt, useReadContract, useSwitchChain } from 'wagmi';
@@ -105,7 +104,7 @@ export const useGameLogic = (isAppReady: boolean, activeSeason: SeasonInfo | und
 
   useEffect(() => {
     if (onChainResult) {
-      const score = (onChainResult as any)?.[1]; // Use any cast to handle potential abi differences, though structure matches
+      const score = (onChainResult as any)?.[1]; 
       console.log(`[ONCHAIN] Successfully fetched best score for ${userAddress} on season ${activeSeason?.id}: ${score}`);
     }
     if (onChainResultError) {
@@ -330,6 +329,13 @@ export const useGameLogic = (isAppReady: boolean, activeSeason: SeasonInfo | und
       return;
     }
 
+    // Safety check: Only allow submission if current score is strictly greater than the server best score for on-chain seasons
+    const currentOnChainBest = serverBestScore ?? 0;
+    if (activeSeason.contractAddress && score <= currentOnChainBest) {
+      setSubmissionStatus('Score must exceed your current peak rate.');
+      return;
+    }
+
     setIsSubmitting(true);
     
     if (activeSeason.contractAddress) {
@@ -344,8 +350,6 @@ export const useGameLogic = (isAppReady: boolean, activeSeason: SeasonInfo | und
         // Check if v2 fee is still loading
         if (isV2 && isFeeLoading) {
              setSubmissionStatus('Fetching fee data...');
-             // Wait briefly? Or just fail? Let's assume if user clicked, we can wait a moment or fail.
-             // Ideally we shouldn't enable the button if loading, but for now:
              if (feeAmount === undefined) {
                  throw new Error("Unable to determine transaction fee. Please try again.");
              }
@@ -397,8 +401,6 @@ export const useGameLogic = (isAppReady: boolean, activeSeason: SeasonInfo | und
         let valueToSend: bigint | undefined = undefined;
 
         if (isV2) {
-             // V2 requires referrer and potentially a fee
-             // Use the parsed referrer if valid, otherwise 0 address
              let finalReferrer = '0x0000000000000000000000000000000000000000';
              if (referrer && isAddress(referrer)) {
                  finalReferrer = referrer;
@@ -465,7 +467,7 @@ export const useGameLogic = (isAppReady: boolean, activeSeason: SeasonInfo | und
     } finally {
       setIsSubmitting(false);
     }
-  }, [score, hasSubmittedScore, isSubmitting, activeSeason, tiles, seed, startTime, randomness, finalMovesHash, userAddress, isConnected, wagmiAddress, connect, connectors, writeContract, chain, switchChain, contractAbi, isV2, feeAmount, isFeeLoading, referrer]);
+  }, [score, hasSubmittedScore, isSubmitting, activeSeason, tiles, seed, startTime, randomness, finalMovesHash, userAddress, isConnected, wagmiAddress, connect, connectors, writeContract, chain, switchChain, contractAbi, isV2, feeAmount, isFeeLoading, referrer, serverBestScore]);
 
   const performMove = useCallback(async (direction: 'up' | 'down' | 'left' | 'right') => {
     if (isGameOver || isMoving || !prng || !finalMovesHash) return;
