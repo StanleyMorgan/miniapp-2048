@@ -154,24 +154,9 @@ const Game: React.FC<{
         return '****';
     }
 
-    // Special handling for Farcaster off-chain season to show multipliers
+    // Special handling for Farcaster off-chain season
     if (activeSeason.id === 'farcaster') {
-        const currentUserEntry = leaderboardData.find(entry => entry.isCurrentUser);
-        if (!currentUserEntry || !currentUserEntry.rank) return null;
-
-        const rank = currentUserEntry.rank;
-        let multiplier = 1.00;
-
-        if (rank > 0 && rank <= FARCASTER_REWARD_MULTIPLIERS.length) {
-            multiplier = FARCASTER_REWARD_MULTIPLIERS[rank - 1];
-        }
-
-        return (
-            <>
-                <span className="text-orange-400">{multiplier.toFixed(2)}</span>
-                <span className="text-white ml-1">X</span>
-            </>
-        );
+        return '****';
     }
 
     // A season must be on-chain (have a contract address) and have a prize pool to have rewards.
@@ -218,6 +203,9 @@ const Game: React.FC<{
   };
 
   const renderTimer = () => {
+    if (activeSeason.id === 'farcaster') {
+      return '****';
+    }
     if (activeSeason.endDate) {
       return <CountdownTimer targetDate={activeSeason.endDate} />;
     }
