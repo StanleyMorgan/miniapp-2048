@@ -17,7 +17,7 @@ const ScoreBox: React.FC<{ title: string; score: number }> = ({ title, score }) 
 
 const GameControls: React.FC<GameControlsProps> = ({ score, bestScore, onNewGame }) => {
   // SET THIS TO TRUE TO ENABLE THE CLAIM BUTTON
-  const IS_CLAIM_ENABLED = false;
+  const IS_CLAIM_ENABLED = true;
   
   const handleClaim = async () => {
     if (!IS_CLAIM_ENABLED) return;
